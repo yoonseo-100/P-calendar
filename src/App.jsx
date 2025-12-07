@@ -37,7 +37,7 @@ const sampleEvents = [
 
 const flowSuggestions = [
   { id: 'match', title: '연관 일정 추천', desc: '지난주 “완벽주의 디톡스” 일정과 연결할까요?' },
-  { id: 'sticker', title: '스티커 업데이트', desc: '이번 주 집중도 70% 달성! “Flow Hunter” 배지 지급' },
+  { id: 'sticker', title: '스티커 업데이트', desc: '이번 주 집중도 70% 달성 “Flow Hunter” 배지 지급' },
 ]
 
 const calendarDays = Array.from({ length: 30 }, (_, idx) => idx + 1)
