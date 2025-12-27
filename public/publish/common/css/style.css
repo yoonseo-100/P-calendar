@@ -498,6 +498,7 @@ nav .tabs .tabItem {
 
 nav .tabs .tabItem>* {
     writing-mode: vertical-rl;
+    font-family: 'pretendard', sans-serif !important;
 }
 
 /* 위/아래 삼각 장식 */
@@ -564,21 +565,33 @@ section.loca-calendar .calendar .calRow.type-head {
 }
 
 .calendar .calRow,
-.calendar .calRow .calSell .topic,
-.calendar .calRow .calSell .plan .planItem {
+.calendar .calRow .calSell .topic{
 
     display: flex;
     width: 100%;
 }
-
 .calendar .calRow .calSell {
-    flex: 1;
+    display: inline-block;
+    width: calc(100% / 7);
     border: 1px solid #333;
     border-left: unset;
 }
 .calendar .calRow.type-body .calSell{
     min-height:calc(100vw/7);
     
+}
+.calendar .calRow .calSell.type-holi .topic{
+    color: var(--color-primary);
+}
+.calendar .calRow.type-body .calSell.type-back {
+}
+.calendar .calRow.type-body .calSell.type-yet .topic .cont-weather{
+    color:#bbb;
+    font-style: italic;
+}
+.calendar .calRow.type-body .calSell.type-today .topic h5 {
+    font-weight: bold;
+    text-decoration: underline;
 }
 
 .calendar .calRow:not(:last-child) .calSell {
@@ -592,11 +605,10 @@ section.loca-calendar .calendar .calRow.type-head {
 .calendar .calRow .calSell .topic {
     align-items: center;
     justify-content: space-between;
-    padding:4px 4px 2px;
+    padding:6px;
 }
 
 .calendar .calRow .calSell .topic .cont-weather {
-    display: none;
 
     font-family: "Digital Numbers", "pretendard", sans-serif !important;
     letter-spacing: -0.15rem;
@@ -606,26 +618,35 @@ section.loca-calendar .calendar .calRow.type-head {
     bottom: 1px;
     transform: translateY(100%);
 }
+.sticky-header .type-head .calSell.type-today {
+    background-color: #000;
+    color: #fff;
+}
 .sticky-header .type-head.calRow .calSell .topic{
-    padding-bottom: 6px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.sticky-header .type-head.calRow .calSell{
+    border-bottom-width: 3px;
 }
 .calendar .calRow .calSell .plan .planItem {
-    gap: 4px;
     align-items: center;
-    margin-bottom: 1px;
+    
+}
+.calendar .calRow .calSell .plan .planItem > *{
+    display: inline-block;
 }
 
 .calendar .calRow .calSell .plan .planItem .time {
     background-color: #ddd;
     width: 26px;
     height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding-top: 4px;
 }
 
 .calendar .calRow .calSell .plan .planItem .time>* {
-    line-height: .75rem;
+    line-height: .7rem;
     font-size: .8rem;
     text-align: right;
     width: fit-content;
@@ -633,14 +654,27 @@ section.loca-calendar .calendar .calRow.type-head {
     display: block;
 }
 
-.calendar .calRow .calSell .plan .planItem .info {
-    white-space: nowrap;
+.calendar .calRow .calSell .plan .planItem .info{
+
+    width: calc(100% - 26px - 4px);
+    padding:0 1px;
+}
+.calendar .calRow .calSell .plan .planItem .info h6{
     text-overflow: ellipsis;
     overflow: hidden;
-    flex: 1;
 }
 
+.calendar .calRow .calSell.type-back .plan .planItem.type-done .time{
+    background-color: #999;
+    color: #eee;
+    font-weight: 100;
+}
 
+.calendar .calRow .calSell.type-back .plan .planItem.type-done .info{
+    color: #aaa;
+    text-decoration: line-through;
+    font-weight: 100;
+}
 
 
 @media (max-width: 500px) {
@@ -701,5 +735,20 @@ nav .tabs .tabItem.NOW::after {
 
     .sticky-header .type-head.calRow .calSell .topic h6 {
         display: none;
+    }
+
+    .calendar .calRow .calSell .topic{
+        justify-content: center;
+      padding: 4px 4px 2px;  
+    }
+    .calendar .calRow .calSell .topic .cont-weather,
+    .calendar .calRow .calSell .plan .planItem .info,
+    .calendar .calRow .calSell .plan .planItem .time br{
+        display: none;
+    }
+    .calendar .calRow .calSell .plan .planItem .time{
+        width: 100%;
+        height: unset;
+        padding: 4px 1px;
     }
 }
