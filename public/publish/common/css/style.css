@@ -1,0 +1,705 @@
+:root {
+    --color-primary: #F86841;
+    --color-white: #FFFFFF;
+}
+
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-size: 14px;
+}
+
+body {
+    background-color: var(--color-primary);
+}
+
+@font-face {
+    font-family: "Digital Numbers";
+    src: url("https://db.onlinewebfonts.com/t/df8665d3e226b24d8a296cb34a3692fd.eot");
+    src: url("https://db.onlinewebfonts.com/t/df8665d3e226b24d8a296cb34a3692fd.eot?#iefix")format("embedded-opentype"),
+        url("https://db.onlinewebfonts.com/t/df8665d3e226b24d8a296cb34a3692fd.woff2")format("woff2"),
+        url("https://db.onlinewebfonts.com/t/df8665d3e226b24d8a296cb34a3692fd.woff")format("woff"),
+        url("https://db.onlinewebfonts.com/t/df8665d3e226b24d8a296cb34a3692fd.ttf")format("truetype"),
+        url("https://db.onlinewebfonts.com/t/df8665d3e226b24d8a296cb34a3692fd.svg#Digital Numbers")format("svg");
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Thin.woff2') format('woff2');
+    font-weight: 100;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-ExtraLight.woff2') format('woff2');
+    font-weight: 200;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Light.woff2') format('woff2');
+    font-weight: 300;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-SemiBold.woff2') format('woff2');
+    font-weight: 600;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-ExtraBold.woff2') format('woff2');
+    font-weight: 800;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/pretendard@1.0/Pretendard-Black.woff2') format('woff2');
+    font-weight: 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Ridibatang';
+    src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_twelve@1.0/RIDIBatang.woff') format('woff');
+    font-weight: normal;
+    font-display: swap;
+}
+
+* {
+    font-family: 'Ridibatang','Pretendard', sans-serif !important;
+
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    white-space: nowrap;
+    letter-spacing: -0.04rem;
+}
+
+h1 {
+    font-size: 3rem;
+    line-height: 4.2rem;
+}
+
+h2 {
+    font-size: 2.2rem;
+    line-height: 2.8rem;
+}
+
+h3 {
+    font-size: 1.8rem;
+    line-height: 2.2rem;
+}
+
+h4 {
+    font-size: 1.6rem;
+    line-height: 2rem;
+}
+
+h5 {
+    font-size: 1.2rem;
+    line-height: 1.6rem;
+}
+
+h6 {
+    font-size: 1rem;
+    line-height: 1.3rem;
+}
+
+p {
+    font-size: .8rem;
+    line-height: 1.1rem;
+}
+
+
+.font-bold200 {
+    font-weight: 200;
+}
+
+.font-bold300 {
+    font-weight: 300;
+}
+
+.font-bold500 {
+    font-weight: 500;
+}
+
+.font-bold600 {
+    font-weight: 600;
+}
+
+b {
+    font-weight: 800;
+}
+
+
+
+
+
+
+
+
+
+
+/* HOME *****************************************8*/
+section.frame{
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+section.frame.loca-home{
+    display: flex;
+    flex-direction: column;
+}
+
+/* section.frame header,
+section.frame footer{
+    height: 50px;
+} */
+section.frame .content{
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+
+section.frame.loca-home .content {
+    display: flex;
+    overflow: hidden;
+    flex-direction: column;
+}
+section.frame.loca-home .content h1.title{
+    width: 100%;
+    padding-top: 5vh;
+    color: var(--color-white);
+    text-align: center;
+}
+section.frame.loca-home .content .circleTable{
+    flex: 1;
+    position: relative;
+}
+
+section.frame.loca-home .content .todoList {
+    width: 90%;
+    transform: rotate(-10deg);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    background-color: #FEFEFE;
+    box-shadow: 0 4px 17px 0 #F4623B, 0 12px 10px 0 rgba(0, 0, 0, 0.10);
+    transform-origin: center bottom;
+    margin-left: 9% ;
+}
+
+
+section.frame.loca-home .content .todoList .headBox {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+section.frame.loca-home .content .todoList .headBox .controlBox {
+    display: flex;
+    gap: 4px;
+}
+section.frame.loca-home .content .todoList .headBox .controlBox button{
+    width: 32px;
+    height: 32px;
+    background-color: #eee;
+    color: #aaa;
+    border-radius: 50%;
+    display: flex;
+
+    justify-content: center;
+    align-items: center;
+}
+
+section.frame.loca-home .content .todoList .contBox ul {
+    display: flex;
+    gap: 8px;
+    flex-direction: column;
+    color: #333;
+}
+section.frame.loca-home .content .todoList .contBox ul li {
+    position: relative;
+}
+
+section.frame.loca-home .content .todoList .contBox ul li label * {
+    display: inline-block;
+}
+section.frame.loca-home .content .todoList .contBox ul li input[type="checkbox"] {
+    width:100%;
+    height: 100%;
+    position: absolute;
+    opacity: 0;
+    left: 0;
+    top: 0;
+    margin: 0;
+}
+section.frame.loca-home .content .todoList .contBox ul li input[type="checkbox"] + label {
+    display: flex;
+    width: 100%;
+    white-space: nowrap;
+    align-items: center;
+}
+section.frame.loca-home .content .todoList .contBox ul li input[type="checkbox"] + label::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    border: 1px solid #ccc;
+    margin-right: 8px;
+}
+
+section.frame.loca-home .content .todoList .contBox ul li input[type="checkbox"]:checked + label {
+    text-decoration: line-through;
+    color: #aaa;
+}
+section.frame.loca-home .content .todoList .contBox ul li input[type="checkbox"]:checked + label::before {
+    background-color: #999;
+    border-color: #999;
+}
+
+section.frame.loca-home .content .todoList .contBox ul li label .text {
+    overflow: hidden;
+    flex: 1;
+    text-overflow: ellipsis;
+}
+
+section.frame.loca-home .content .todoList .contBox .detailBtn {
+    display: block;
+    margin-left:auto ;
+    margin-right: 0;
+    width: fit-content;
+    color: #999;
+    font-style: italic;
+    border-bottom: 1px solid #ddd;
+}
+
+
+.pie {
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    overflow: hidden;
+    border-radius: 50%;
+    z-index: 1;
+
+    background-color: var(--color-white);
+}
+
+.pie ul:after {
+    content: " ";
+    display: block;
+    width: 100%;
+    padding-top: 100%
+}
+
+.pie li {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 100%;
+    height: 100%;
+    margin-left: -2px;
+    margin-top: -2px;
+    overflow: hidden;
+    -webkit-transform-origin: 100% 100%;
+    -ms-transform-origin: 100% 100%;
+    transform-origin: 100% 100%;
+}
+
+
+.pie a {
+    pointer-events: auto;
+    font-size: 2.125vw;
+    /*line-height:170%;*/
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    color: transparent;
+}
+.pie a::before{
+    color: #ddd;
+}
+
+.pie a [class*=deco] {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+}
+
+.pie a [class*=deco]::before {
+    content: '';
+    position: absolute;
+    width: 1px;
+    height: 20px;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #000;
+}
+
+.pie a .deco2 {
+    transform: translate(-50%, -50%) rotate(calc(360/24/2*-1deg));
+}
+
+.pie a .deco2::before {
+    height: 10px;
+}
+
+.pie a:hover {
+    background: rgba(0, 0, 0, 0.1)
+}
+
+/* Clock hands overlay */
+.pie-outer .hands {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+/* Hand common */
+.hour-hand,
+.minute-hand {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    width: 2px;
+    margin-left: -1px;
+    /* center the thin rectangle */
+    transform-origin: 50% 100%;
+    border-radius: 2px;
+    background: #000;
+    transform: rotate(0deg);
+    transition: transform 0.2s linear;
+    /* smooth movement */
+    background: var(--color-primary);
+}
+
+/* Sizes relative to pie-outer */
+.hour-hand {
+    height: 30%;
+}
+
+.minute-hand {
+    display: none;
+    height: 42%;
+}
+
+/* center pivot dot */
+.center-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    z-index: 6;
+    pointer-events: none;
+}
+
+
+
+
+
+
+/* CALENDAR ***************************************/
+section.frame.loca-calendar{
+    display: flex;
+}
+
+
+section.loca-calendar nav {
+    position: relative;
+    width: 50px;
+    order: 2;
+}
+
+
+section.loca-calendar nav::before {
+    content: '';
+    position: absolute;
+    left: -1px;
+    height: 100%;
+    width: 2px;
+    background-color: #fff;
+}
+
+nav .tabs {
+    padding-right: 2px;
+}
+
+
+nav .tabs .tabItem {
+    position: relative;
+    width: 100%;
+    margin: 6px 0 7px;
+    padding: 12px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ddd;
+}
+
+nav .tabs .tabItem>* {
+    writing-mode: vertical-rl;
+}
+
+/* 위/아래 삼각 장식 */
+nav .tabs .tabItem::before,
+nav .tabs .tabItem::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    width: 100%;
+    height: 0;
+    border-style: solid;
+}
+
+nav .tabs .tabItem::before {
+    top: 0;
+    transform: translate(-50%, -95%);
+    border-width: 8px 0px 0px 48px;
+    border-color: transparent transparent transparent #ddd;
+}
+
+nav .tabs .tabItem::after {
+    border-width: 8px 48px 0px 0px;
+    border-color: #ddd transparent transparent transparent;
+    transform: translate(-50%, 95%);
+    bottom: 0;
+}
+
+nav .tabs .tabItem.NOW {
+    background-color: var(--color-white);
+}
+
+nav .tabs .tabItem.NOW::before {
+    border-color: transparent transparent transparent var(--color-white);
+}
+
+nav .tabs .tabItem.NOW::after {
+    border-color: var(--color-white) transparent transparent transparent;
+}
+
+
+section.loca-calendar > .content {
+    order: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: #fff;
+
+    overflow-y: auto;
+}
+
+section.loca-calendar .calendar .calRow.type-month-title {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 8px 8px;
+    border-bottom: 1px solid #333;
+}
+section.loca-calendar .calendar .calRow.type-head {
+    background-color: #fff;
+}
+
+
+.calendar {
+    width: 100%;
+}
+
+.calendar .calRow,
+.calendar .calRow .calSell .topic,
+.calendar .calRow .calSell .plan .planItem {
+
+    display: flex;
+    width: 100%;
+}
+
+.calendar .calRow .calSell {
+    flex: 1;
+    border: 1px solid #333;
+    border-left: unset;
+}
+.calendar .calRow.type-body .calSell{
+    min-height:calc(100vw/7);
+    
+}
+
+.calendar .calRow:not(:last-child) .calSell {
+    border-bottom: 0;
+}
+
+.calendar .calRow .calSell:last-child {
+    border-right: 0;
+}
+
+.calendar .calRow .calSell .topic {
+    align-items: center;
+    justify-content: space-between;
+    padding:4px 4px 2px;
+}
+
+.calendar .calRow .calSell .topic .cont-weather {
+    display: none;
+
+    font-family: "Digital Numbers", "pretendard", sans-serif !important;
+    letter-spacing: -0.15rem;
+}
+.sticky-header .type-head {
+    position: absolute;
+    bottom: 1px;
+    transform: translateY(100%);
+}
+.sticky-header .type-head.calRow .calSell .topic{
+    padding-bottom: 6px;
+}
+.calendar .calRow .calSell .plan .planItem {
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 1px;
+}
+
+.calendar .calRow .calSell .plan .planItem .time {
+    background-color: #ddd;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calendar .calRow .calSell .plan .planItem .time>* {
+    line-height: .75rem;
+    font-size: .8rem;
+    text-align: right;
+    width: fit-content;
+    margin: 0 auto;
+    display: block;
+}
+
+.calendar .calRow .calSell .plan .planItem .info {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    flex: 1;
+}
+
+
+
+
+@media (max-width: 500px) {
+    section.frame.loca-calendar{
+    flex-direction: column;
+}
+    section.loca-calendar nav {
+        width: 100%;
+        padding-bottom: 6px;
+    }
+    nav .tabs{
+        display: flex;
+    }
+    nav .tabs .tabItem{
+        width: fit-content;
+        padding: 6px 12px;
+        margin:0 6px 0 7px;
+    }
+    nav .tabs .tabItem>*{
+        writing-mode: unset;
+    }
+
+
+
+    
+/* 위/아래 삼각 장식 */
+nav .tabs .tabItem::before,
+nav .tabs .tabItem::after {
+    left: unset;
+    top: 50%;
+    width: 0;
+    height: 100%;
+}
+
+nav .tabs .tabItem::before {
+    left: 0;
+    transform: translate(-95%, -50%);
+    border-width: 0  8px 40px 0;
+    border-color:  transparent #ddd  transparent transparent;
+}
+
+nav .tabs .tabItem::after {
+    border-width: 0 0 40px 8px;
+    border-color:  transparent transparent transparent #ddd ;
+    transform: translate(95%, -50%);
+    right: 0;
+}
+
+nav .tabs .tabItem.NOW::before {
+    border-color: transparent var(--color-white) transparent transparent ;
+}
+
+nav .tabs .tabItem.NOW::after {
+    border-color: transparent transparent transparent var(--color-white);
+}
+
+
+
+    .sticky-header .type-head.calRow .calSell .topic h6 {
+        display: none;
+    }
+}
