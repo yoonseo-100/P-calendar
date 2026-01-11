@@ -28,10 +28,20 @@
                             <h5>주 시작 요일</h5>
                             <p>캘린더에서 한 주의 시작</p>
                         </div>
-                        <select class="settingsSelect">
+                        <select class="settingsSelect" id="weekStartSelect">
                             <option value="MON" selected>월요일</option>
                             <option value="SUN">일요일</option>
                         </select>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>날씨 표시</h5>
+                            <p>날짜 옆에 기온을 표시합니다</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="showWeatherToggle" checked>
+                            <span class="slider"></span>
+                        </label>
                     </div>
                     <div class="settingsItem">
                         <div class="label">
@@ -54,6 +64,43 @@
                             <option>America/Los_Angeles (PST)</option>
                             <option>Europe/London (GMT)</option>
                         </select>
+                    </div>
+                </section>
+
+                <section class="settingsCard">
+                    <h3>수면 목표</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>평일 기상</h5>
+                        </div>
+                        <div class="settingsRange" aria-label="평일 기상 및 취침 시간">
+                            <input class="settingsInput" id="weekdayWakeTime" type="time" value="07:00" />
+                            <span class="settingsRangeSep">~</span>
+                            <input class="settingsInput" id="weekdaySleepTime" type="time" value="23:00" />
+                        </div>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>주말 수면 목표 별도 설정</h5>
+                            <p>토/일은 따로 기상·취침 시간을 관리해요</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="weekendSleepSeparate" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="settingsSleepWeekend" id="weekendSleepSection">
+                        <div class="settingsItem">
+                            <div class="label">
+                                <h5>주말 기상</h5>
+                            </div>
+                            <div class="settingsRange" aria-label="주말 기상 및 취침 시간">
+                                <input class="settingsInput" id="weekendWakeTime" type="time" value="09:00" />
+                                <span class="settingsRangeSep">~</span>
+                                <input class="settingsInput" id="weekendSleepTime" type="time" value="00:00" />
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -133,5 +180,6 @@
 </body>
 
 <script src="../../common/js/nav.js"></script>
+<script src="../../common/js/settings.js"></script>
 
 </html>

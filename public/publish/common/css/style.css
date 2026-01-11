@@ -556,12 +556,152 @@ section.frame.loca-home .content .todoList .contBox ul li label .text {
 
 section.frame.loca-home .content .todoList .contBox .detailBtn {
     display: block;
-    margin:10px 0 0 auto;    
+    margin:10px 0 0 auto;
     width: fit-content;
     color: #999;
     font-style: italic;
     border-bottom: 1px solid #ddd;
 }
+
+.settingsSleepWeekend {
+    display: block;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+
+.settingsSleepWeekend.is-disabled {
+    opacity: 0.45;
+}
+
+.settingsRange {
+    width: 170px;
+    max-width: 48vw;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.settingsRange .settingsInput {
+    width: 78px;
+    max-width: 22vw;
+}
+
+.settingsRangeSep {
+    color: rgba(0, 0, 0, 0.55);
+    font-size: 14px;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+/* MEMO (Checklist) ***************************************/
+section.frame.loca-calendar.loca-memo > .content {
+    padding: 18px 14px;
+}
+
+.memoTitle {
+    margin: 6px 0 14px;
+    color: #111;
+}
+
+section.frame.loca-calendar.loca-memo .memoDays {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+section.frame.loca-calendar.loca-memo .todoList {
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    border-bottom: 1px solid #ddd;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .headBox {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .headBox .date b {
+    color: #111;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul {
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
+    color: #333;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li {
+    position: relative;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li input[type="checkbox"] {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    opacity: 0;
+    left: 0;
+    top: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li input[type="checkbox"] + label {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 8px;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li input[type="checkbox"] + label::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    border: 1px solid #ccc;
+    flex: 0 0 auto;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li input[type="checkbox"]:checked + label {
+    text-decoration: line-through;
+    color: #aaa;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li input[type="checkbox"]:checked + label::before {
+    background-color: #999;
+    border-color: #999;
+}
+
+section.frame.loca-calendar.loca-memo .todoList .contBox ul li label .text {
+    overflow: hidden;
+    flex: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+section.frame.loca-calendar.loca-memo .memoEmpty {
+    color: #999;
+    font-style: italic;
+}
+
+section.frame.loca-calendar.loca-memo .detailBtn {
+    display: block;
+    margin: 10px auto 0;
+    width: fit-content;
+    color: #999;
+    font-style: italic;
+    border-bottom: 1px solid #ddd;
+}
+
 
 
 .pie {
@@ -1060,6 +1200,13 @@ section.loca-calendar .calendar .calRow.type-head {
     flex-direction: row;
 }
 
+.calendar + .detail .detailBody{
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+}
+
 .calendar + .detail .timetable{
     flex: 0 0 56px;
     border-right: 1px solid rgba(0, 0, 0, 0.08);
@@ -1075,8 +1222,12 @@ section.loca-calendar .calendar .calRow.type-head {
     font-family: "Digital Numbers", "pretendard", sans-serif !important;
 }
 
+.calendar + .detail .timetable .time.is-sleep{
+    background: rgba(0, 0, 0, 0.04);
+}
+
 .calendar + .detail .scheduleGrid{
-    flex: 1;
+    flex: 0 0 50%;
     min-width: 0;
     position: relative;
     height: calc(var(--row-h) * var(--rows));
@@ -1085,14 +1236,93 @@ section.loca-calendar .calendar .calRow.type-head {
     --outer-pad: 4px;
     --gap-x: 2px;
     --more-w: 40px;
-    --max-visible-lanes: 2;
-    /* 2 lanes + (lane gaps) + (gap to more) inside padded area */
+    --max-visible-lanes: 1;
+    /* 1 lane + (gap to more) inside padded area */
     --lane-w: calc((100% - (var(--outer-pad) * 2) - var(--more-w) - (var(--gap-x) * (var(--max-visible-lanes) - 1)) - var(--gap-x)) / var(--max-visible-lanes));
+}
+
+.calendar + .detail .allDayPanel{
+    flex: 0 0 50%;
+    min-width: 0;
+    border-left: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+
+    
+    height: 100%;
+    position: fixed;
+    right: 0;
+    width: calc(50% - 25px);
+    overflow-y: auto;
+    padding-top: 37px;
+}
+
+.calendar + .detail .allDayHeader{
+    position: absolute;
+    top: 0;
+    padding: 10px 10px 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.calendar + .detail .allDayHeader h6{
+    margin: 0;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.75);
+}
+
+.calendar + .detail .allDayList{
+    padding: 10px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.calendar + .detail .allDayItem{
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: #fff;
+    border-radius: 12px;
+    padding: 10px 10px;
+    cursor: pointer;
+}
+
+.calendar + .detail .allDayItem .info h6{
+    margin: 0;
+    font-size: 13px;
+    color: #111;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar + .detail .allDayItem .info .meta{
+    margin: 4px 0 0;
+    font-size: 11px;
+    color: rgba(0, 0, 0, 0.55);
+}
+
+.calendar + .detail .allDayItem.type-done{
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+.calendar + .detail .allDayEmpty{
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.04);
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 13px;
 }
 
 .calendar + .detail .scheduleGrid .gridRow{
     height: var(--row-h);
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.calendar + .detail .scheduleGrid .gridRow.is-sleep{
+    background: rgba(0, 0, 0, 0.04);
 }
 
 .calendar + .detail .timelineItem{
@@ -1120,6 +1350,7 @@ section.loca-calendar .calendar .calRow.type-head {
     border-radius: 12px;
     background: rgba(0, 0, 0, 0.5);
     color: #fff;
+    cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1244,6 +1475,12 @@ nav .tabs .tabItem.NOW::after {
     transition: opacity 160ms ease;
 }
 
+.popup-overlay.is-suspended {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .popup-content {
     width: min(420px, 100%);
     max-height: 90vh;
@@ -1284,23 +1521,108 @@ nav .tabs .tabItem.NOW::after {
     padding: 16px 18px;
 }
 
+.overlapRange{
+    margin: 0 0 10px;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 12px;
+}
+
+.overlapList{
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.overlapItem{
+    width: 100%;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: #fff;
+    cursor: pointer;
+}
+
+.overlapItem.type-done{
+    opacity: 0.6;
+}
+
+.overlapItem .title{
+    margin: 0;
+    color: #111;
+    font-size: 14px;
+    line-height: 1.2;
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+}
+
+.overlapItem .time{
+    flex: 0 0 auto;
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.overlapEmpty{
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.04);
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 13px;
+}
+
 .popup .taskSuggest{
     margin-top: 14px;
     padding-top: 12px;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-.popup .taskSuggest h4{
+.popup .taskSuggest.is-collapsed .taskTableWrap,
+.popup .taskSuggest.is-collapsed .taskHint{
+    display: none;
+}
+
+.popup .taskSuggestHeader{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     margin: 0 0 10px;
+}
+
+.popup .taskSuggestHeader h4{
+    margin: 0;
     font-size: 14px;
     color: #111;
+}
+
+.popup .taskSuggestBtn{
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: #fff;
+    color: rgba(0, 0, 0, 0.72);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.popup .taskSuggestBtn:hover{
+    background: rgba(0, 0, 0, 0.04);
 }
 
 .popup .taskTableWrap{
     border-radius: 10px;
     border: 1px solid rgba(0, 0, 0, 0.12);
     overflow: auto;
-    max-height: 180px;
     background: #fff;
 }
 
@@ -1376,6 +1698,39 @@ nav .tabs .tabItem.NOW::after {
     margin-bottom: 8px;
     font-size: 14px;
     color: #222;
+}
+
+.form-group .dateRow{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-group .dateRow > input[type="date"]{
+    flex: 1;
+}
+
+.form-group .dateExtras{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.form-group .dateExtras label{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+    white-space: nowrap;
+}
+
+.form-group .dateExtras input[type="checkbox"]{
+    width: 16px;
+    height: 16px;
+    margin: 0;
 }
 
 .form-group input[type="text"],
@@ -1559,13 +1914,22 @@ section.frame.loca-calendar.loca-settings .content {
     width: 170px;
     max-width: 48vw;
     height: 38px;
-    padding: 0 12px;
+    padding: 0 6px;
     border-radius: 10px;
     border: 1px solid rgba(0, 0, 0, 0.15);
     background: #fff;
     color: #111;
     font-size: 14px;
     outline: none;
+}
+.settingsInput[type="time"]{
+    width: 120px;
+}
+
+.settingsInput:disabled,
+.settingsSelect:disabled{
+    background-color: #eee;
+    color: #999;
 }
 
 .settingsInput:focus,

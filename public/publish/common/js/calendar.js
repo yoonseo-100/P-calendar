@@ -1,8 +1,68 @@
 
 // Configuration
-const WEEK_START = 'MON'; // Change to 'SUN' for Sunday start
+const APP_SETTINGS_KEY = '__p_calendar_settings__';
+const APP_SCHEDULES_KEY = '__p_calendar_schedules__';
+const OPENAI_API_KEY_STORAGE = '__p_calendar_openai_api_key__';
+const RECENT_SCHEDULE_NAMES_KEY = '__p_calendar_recent_schedule_names__';
+const UNDATED_DATE_KEY = '__undated__';
+
+function readAppSettings() {
+    try {
+        return JSON.parse(localStorage.getItem(APP_SETTINGS_KEY) || '{}') || {};
+    } catch {
+        return {};
+    }
+}
+
+const APP_SETTINGS = readAppSettings();
+const WEEK_START = APP_SETTINGS?.calendar?.weekStart === 'SUN' ? 'SUN' : 'MON';
+const SHOW_WEATHER = APP_SETTINGS?.calendar?.showWeather !== false;
 const CURRENT_DATE = new Date();
 CURRENT_DATE.setHours(0, 0, 0, 0);
+
+function loadSchedulesFromStorage() {
+    try {
+        const raw = localStorage.getItem(APP_SCHEDULES_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return;
+
+        let maxId = 0;
+
+        Object.keys(parsed).forEach((dateKey) => {
+            const list = parsed[dateKey];
+            if (!Array.isArray(list)) return;
+            const prepared = ensureScheduleMeta(dateKey, list);
+            scheduleByDate.set(dateKey, prepared);
+
+            prepared.forEach((s) => {
+                const m = String(s?.id || '').match(/^s(\d+)$/);
+                if (m) {
+                    const n = parseInt(m[1], 10);
+                    if (!Number.isNaN(n)) maxId = Math.max(maxId, n);
+                }
+            });
+        });
+
+        if (maxId > 0) scheduleSequence = Math.max(scheduleSequence, maxId + 1);
+    } catch {
+        // ignore corrupted storage
+    }
+}
+
+function saveSchedulesToStorage() {
+    try {
+        const obj = {};
+        for (const [dateKey, list] of scheduleByDate.entries()) {
+            if (!dateKey) continue;
+            if (!Array.isArray(list) || !list.length) continue;
+            obj[dateKey] = list;
+        }
+        localStorage.setItem(APP_SCHEDULES_KEY, JSON.stringify(obj));
+    } catch {
+        // ignore quota / storage errors
+    }
+}
 
 // Cache for stable per-day content
 const scheduleByDate = new Map();
@@ -69,13 +129,8 @@ const ADD_SCHEDULE_TEMPLATES = [
     },
 ];
 
-const ADD_SCHEDULE_DEFAULT_TASKS = [
-    { title: '회의 안건 정리', due: '' },
-    { title: '참석자 확인/연락', due: '' },
-    { title: '관련 자료 수집', due: '' },
-    { title: '리마인드 알림 설정', due: '' },
-    { title: '결과 공유/정리', due: '' },
-];
+// Default related-task suggestions were removed to avoid showing dummy values.
+const ADD_SCHEDULE_DEFAULT_TASKS = [];
 
 function getTemplateByName(value) {
     const name = normalizeTemplateName(value);
@@ -108,9 +163,52 @@ function buildRelatedTasksRows(tasks) {
         .join('');
 }
 
-function parseTaskDueToDateKeyAndTime(dueString) {
+function buildPlainTasksRows(tasks) {
+    const safeTasks = (tasks || []).slice(0, 12);
+    return safeTasks
+        .map((t) => {
+            const title = String(t?.title ?? '').trim();
+            const due = String(t?.due ?? '').trim();
+            return `
+                <tr>
+                    <td>${title}</td>
+                    <td class="col-due">${due || '-'}</td>
+                </tr>
+            `;
+        })
+        .join('');
+}
+
+function parseTaskDueToDateKeyAndTime(dueString, baseDateKey) {
     const s = String(dueString || '').trim();
     if (!s) return null;
+
+    const baseDate = baseDateKey && baseDateKey !== UNDATED_DATE_KEY ? parseDateKey(baseDateKey) : null;
+
+    const rel = s.match(/^D\s*(?:([+-])\s*)?(\d+)(?:\s+(\d{1,2})\s*:\s*(\d{2}))?$/i);
+    if (rel && baseDate) {
+        const sign = rel[1] === '-' ? -1 : 1;
+        const days = parseInt(rel[2], 10);
+        const hour = rel[3] != null ? parseInt(rel[3], 10) : 9;
+        const minute = rel[4] != null ? parseInt(rel[4], 10) : 0;
+        if ([days, hour, minute].some((n) => Number.isNaN(n))) return null;
+        if (hour < 0 || hour > 23) return null;
+        if (minute < 0 || minute > 59) return null;
+
+        const date = new Date(baseDate);
+        date.setDate(date.getDate() + sign * days);
+        date.setHours(0, 0, 0, 0);
+
+        let endHour = hour + (minute > 0 ? 1 : 0);
+        endHour = Math.max(0, Math.min(endHour, 24));
+        const startHour = Math.max(0, endHour - 1);
+
+        return {
+            dateKey: getDateKey(date),
+            start: pad2(startHour),
+            end: pad2(endHour),
+        };
+    }
 
     // Accept formats like: "2/6 18:00", "02/06 18:00", "2/6", "2/6 9:30"
     const m = s.match(/^(\d{1,2})\s*\/\s*(\d{1,2})(?:\s+(\d{1,2})\s*:\s*(\d{2}))?$/);
@@ -127,7 +225,7 @@ function parseTaskDueToDateKeyAndTime(dueString) {
     if (hour < 0 || hour > 23) return null;
     if (minute < 0 || minute > 59) return null;
 
-    const year = CURRENT_DATE.getFullYear();
+    const year = baseDate ? baseDate.getFullYear() : CURRENT_DATE.getFullYear();
     const date = new Date(year, month - 1, day);
     if (date.getMonth() !== month - 1 || date.getDate() !== day) return null;
     date.setHours(0, 0, 0, 0);
@@ -142,6 +240,26 @@ function parseTaskDueToDateKeyAndTime(dueString) {
         start: pad2(startHour),
         end: pad2(endHour),
     };
+}
+
+function resolveTaskDueString(dueString, baseDateKey) {
+    const s = String(dueString || '').trim();
+    if (!s) return '';
+
+    // If already absolute M/D, keep it as-is.
+    if (/^\d{1,2}\s*\/\s*\d{1,2}/.test(s)) return s;
+
+    // Resolve D-day relative due to absolute "M/D HH:MM" for display/storage.
+    const parsed = parseTaskDueToDateKeyAndTime(s, baseDateKey);
+    if (!parsed?.dateKey) return '';
+
+    const d = parseDateKey(parsed.dateKey);
+    if (!d) return '';
+
+    const endHour = parseInt(String(parsed.end || ''), 10);
+    const hh = Number.isNaN(endHour) ? 9 : Math.max(0, Math.min(endHour, 24));
+
+    return `${d.getMonth() + 1}/${d.getDate()} ${pad2(Math.min(23, hh))}:00`;
 }
 
 function ensureScheduleMeta(dateKey, schedules) {
@@ -207,9 +325,60 @@ function getDayCellClass(date) {
     return className;
 }
 
-const DETAIL_START_HOUR = 7;
+const DETAIL_START_HOUR = 0;
 const DETAIL_END_HOUR = 24;
 const DETAIL_ROW_HEIGHT = 22;
+
+function parseTimeHHMM(value, fallback) {
+    const s = String(value || '').trim();
+    const m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return fallback;
+    const h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    if (Number.isNaN(h) || Number.isNaN(min)) return fallback;
+    if (h < 0 || h > 23) return fallback;
+    if (min < 0 || min > 59) return fallback;
+    return { h, min };
+}
+
+function getSleepSettingForDateKey(dateKey) {
+    const date = parseDateKey(dateKey);
+    const isWeekend = date ? date.getDay() === 0 || date.getDay() === 6 : false;
+
+    const defaults = {
+        weekday: { wake: '07:00', sleep: '23:00' },
+        weekendEnabled: false,
+        weekend: { wake: '09:00', sleep: '00:00' },
+    };
+
+    const raw = APP_SETTINGS?.sleep || {};
+    const weekendEnabled = typeof raw.weekendEnabled === 'boolean' ? raw.weekendEnabled : defaults.weekendEnabled;
+    const useWeekend = !!weekendEnabled && isWeekend;
+    const src = useWeekend ? (raw.weekend || {}) : (raw.weekday || {});
+    const base = useWeekend ? defaults.weekend : defaults.weekday;
+
+    const wake = typeof src.wake === 'string' ? src.wake : base.wake;
+    const sleep = typeof src.sleep === 'string' ? src.sleep : base.sleep;
+
+    const wakeHM = parseTimeHHMM(wake, { h: 7, min: 0 });
+    const sleepHM = parseTimeHHMM(sleep, { h: 23, min: 0 });
+    return { wakeHM, sleepHM };
+}
+
+function isSleepHourForDateKey(hourValue, dateKey) {
+    const { wakeHM, sleepHM } = getSleepSettingForDateKey(dateKey);
+    const hour = ((Number(hourValue) || 0) % 24 + 24) % 24;
+    const wakeH = wakeHM.h;
+    const sleepH = sleepHM.h;
+
+    if (sleepH > wakeH) {
+        // Sleep: [0, wake) U [sleep, 24)
+        return hour < wakeH || hour >= sleepH;
+    }
+
+    // Sleep crosses midnight: sleep is [sleep, wake)
+    return hour >= sleepH && hour < wakeH;
+}
 
 function toHour(value) {
     const s = String(value || '').trim();
@@ -220,10 +389,11 @@ function toHour(value) {
     return Number.isNaN(n) ? null : n;
 }
 
-function buildTimetableHTML() {
+function buildTimetableHTML(dateKey) {
     let html = '<div class="timetable">';
     for (let h = DETAIL_START_HOUR; h <= DETAIL_END_HOUR; h++) {
-        html += `<div class="time" data-hour="${h}">${h}:00</div>`;
+        const sleepClass = dateKey && isSleepHourForDateKey(h, dateKey) ? ' is-sleep' : '';
+        html += `<div class="time${sleepClass}" data-hour="${h}">${h}:00</div>`;
     }
     html += '</div>';
     return html;
@@ -280,12 +450,13 @@ function buildScheduleGridHTML(schedules, dateKey) {
 
     const rows = DETAIL_END_HOUR - DETAIL_START_HOUR + 1;
     const MORE_WIDTH = 40;
-    const MAX_VISIBLE_LANES = 2;
+    const MAX_VISIBLE_LANES = 1;
     let html = `<div class="scheduleGrid" style="--row-h:${DETAIL_ROW_HEIGHT}px; --rows:${rows}; --more-w:${MORE_WIDTH}px; --max-visible-lanes:${MAX_VISIBLE_LANES}">`;
 
     // grid lines
     for (let h = DETAIL_START_HOUR; h <= DETAIL_END_HOUR; h++) {
-        html += `<div class="gridRow" data-hour="${h}"></div>`;
+        const sleepClass = dateKey && isSleepHourForDateKey(h, dateKey) ? ' is-sleep' : '';
+        html += `<div class="gridRow${sleepClass}" data-hour="${h}"></div>`;
     }
 
     // blocks
@@ -342,7 +513,7 @@ function buildScheduleGridHTML(schedules, dateKey) {
         const height = Math.max(DETAIL_ROW_HEIGHT, (seg.endHour - seg.startHour) * DETAIL_ROW_HEIGHT);
         const label = seg.maxOverflow > 1 ? `+${seg.maxOverflow}` : '+';
         html += `
-            <div class="moreBlock" style="--top:${top}px; --height:${height}px" title="더보기">
+            <div class="moreBlock" style="--top:${top}px; --height:${height}px" title="더보기" data-date="${dateKey || ''}" data-start-hour="${seg.startHour}" data-end-hour="${seg.endHour}">
                 <span class="plus">${label}</span>
             </div>
         `;
@@ -350,6 +521,87 @@ function buildScheduleGridHTML(schedules, dateKey) {
 
     html += '</div>';
     return html;
+}
+
+function buildAllDayListHTML(schedules, dateKey) {
+    const items = (schedules || [])
+        .filter((s) => {
+            const startHour = toHour(s?.time?.start);
+            const endHour = toHour(s?.time?.end);
+            return startHour == null || endHour == null;
+        })
+        .map((s) => ({
+            id: s?.id,
+            title: String(s?.type ?? '').trim(),
+            isDone: !!s?.isDone,
+        }))
+        .filter((s) => s.id && s.title);
+
+    const listHTML = items.length
+        ? items
+              .map((s) => {
+                  const doneClass = s.isDone ? ' type-done' : '';
+                  return `
+                    <button type="button" class="planItem allDayItem${doneClass}" data-date="${dateKey || ''}" data-id="${s.id}">
+                        <div class="info">
+                            <h6>${s.title}</h6>
+                        </div>
+                    </button>
+                  `;
+              })
+              .join('')
+        : '';
+        // : '<div class="allDayEmpty">시간 미지정 일정이 없어요</div>';
+
+    return `
+        <div class="allDayPanel">
+            <div class="allDayHeader">
+                <h6>당일 일정</h6>
+            </div>
+            <div class="allDayList">${listHTML}</div>
+        </div>
+    `;
+}
+
+function buildUndatedListHTML() {
+    const schedules = scheduleByDate.get(UNDATED_DATE_KEY) || [];
+    const items = (schedules || [])
+        .map((s) => ({
+            id: s?.id,
+            title: String(s?.type ?? '').trim(),
+            isDone: !!s?.isDone,
+        }))
+        .filter((s) => s.id && s.title);
+
+    const listHTML = items.length
+        ? items
+              .map((s) => {
+                  const doneClass = s.isDone ? ' type-done' : '';
+                  return `
+                    <button type="button" class="planItem allDayItem${doneClass}" data-date="${UNDATED_DATE_KEY}" data-id="${s.id}">
+                        <div class="info">
+                            <h6>${s.title}</h6>
+                        </div>
+                    </button>
+                  `;
+              })
+              .join('')
+        : '';
+
+    return `
+        <div class="allDayPanel" id="undatedPanel">
+            <div class="allDayHeader">
+                <h6>날짜 미정</h6>
+            </div>
+            <div class="allDayList">${listHTML}</div>
+        </div>
+    `;
+}
+
+function renderUndatedPanel() {
+    const host = document.getElementById('undatedPanelHost');
+    if (!host) return;
+    host.innerHTML = buildUndatedListHTML();
 }
 
 function renderDetailForDate(dateKey) {
@@ -361,17 +613,24 @@ function renderDetailForDate(dateKey) {
 
     const schedules = scheduleByDate.get(dateKey) || [];
 
-    const timetableHTML = buildTimetableHTML();
+    const timetableHTML = buildTimetableHTML(dateKey);
     const gridHTML = buildScheduleGridHTML(schedules, dateKey);
+    const allDayHTML = buildAllDayListHTML(schedules, dateKey);
+    const undatedHTML = buildUndatedListHTML();
 
     const emptyHTML = schedules.length
         ? ''
-        : '<div class="planEmpty"><h6>일정이 없어요</h6></div>';
+        : '';
+        // : '<div class="planEmpty"><h6>일정이 없어요</h6></div>';
 
     detail.innerHTML = `
         <div class="detailGrid" data-date="${dateKey}">
             ${timetableHTML}
-            ${gridHTML}
+            <div class="detailBody">
+                ${gridHTML}
+                ${allDayHTML}
+                <div id="undatedPanelHost">${undatedHTML}</div>
+            </div>
         </div>
         ${emptyHTML}
     `;
@@ -489,48 +748,8 @@ row.appendChild(cell);
 return row;
 }
 
-// 일정 데이터
-const scheduleData = {
-    types: ['해커톤 멘토', '외부 미팅', '내부 회의', '프로젝트 마감', '코드 리뷰', '팀 빌딩', '클라이언트 미팅', '기술 세미나'],
-    timeSlots: [
-        { start: '09', end: '18' },
-        { start: '10', end: '12' },
-        { start: '14', end: '16' },
-        { start: '15', end: '17' },
-        { start: '09', end: '11' },
-        { start: '13', end: '15' }
-    ]
-};
-
-function generateSchedulesForDate(date) {
-    const weekNumber = Math.floor(date.getDate() / 7);
-    
-    let schedulesPerWeek;
-    if (date < CURRENT_DATE) {
-        // 과거 날짜: 3~8개
-        schedulesPerWeek = (Math.floor(Math.random() * 6) + 3)*0;
-    } else if (date.toDateString() === CURRENT_DATE.toDateString()) {
-        // 오늘: 3~8개
-        schedulesPerWeek = (Math.floor(Math.random() * 6) + 3 )*0;
-    } else {
-        // 미래 날짜 (type-yet): 0개 70%, 1~2개 30%
-        schedulesPerWeek = (Math.random() < 0.9 ? 0 : Math.floor(Math.random() * 2) + 1)*0;
-    }
-    
-    let schedules = [];
-    for (let i = 0; i < schedulesPerWeek; i++) {
-        const typeIdx = Math.floor(Math.random() * scheduleData.types.length);
-        const timeIdx = Math.floor(Math.random() * scheduleData.timeSlots.length);
-        const isDone = Math.random() > 0.4;
-        
-        schedules.push({
-            type: scheduleData.types[typeIdx],
-            time: scheduleData.timeSlots[timeIdx],
-            isDone: isDone
-        });
-    }
-    return schedules;
-}
+// NOTE: This app used to generate random demo schedules/weather.
+// We now render only persisted schedules (localStorage) to avoid showing dummy values.
 
 function createPlanHTML(dateKeyOrSchedules, maybeSchedules) {
     const dateKey = Array.isArray(dateKeyOrSchedules) ? '' : (dateKeyOrSchedules || '');
@@ -538,13 +757,23 @@ function createPlanHTML(dateKeyOrSchedules, maybeSchedules) {
     let html = '';
     (schedules || []).forEach((schedule) => {
         const doneClass = schedule.isDone ? ' type-done' : '';
-        const start = String(schedule?.time?.start ?? '').padStart(2, '0');
-        const end = String(schedule?.time?.end ?? '').padStart(2, '0');
+        const startRaw = schedule?.time?.start;
+        const endRaw = schedule?.time?.end;
+        const hasTime = toHour(startRaw) != null && toHour(endRaw) != null;
+        // Calendar cells should not show time-unset items ("미지정").
+        // Those are rendered separately in the detail panel's "당일 일정" list.
+        if (!hasTime) return;
+        const start = hasTime ? String(startRaw).padStart(2, '0') : '';
+        const end = hasTime ? String(endRaw).padStart(2, '0') : '';
         const title = String(schedule?.type ?? '').trim();
+
+        const timeHTML = hasTime
+            ? `<span>${start}<br>~${end}</span>`
+            : `<span>미지정</span>`;
         html += `
         <div class="planItem${doneClass}" data-date="${dateKey || ''}" data-id="${schedule?.id || ''}">
             <div class="time">
-                <span>${start}<br>~${end}</span>
+                ${timeHTML}
             </div>
             <div class="info">
                 <h6>${title}</h6>
@@ -612,18 +841,22 @@ function generateMonthRows(container, year, month, currentRow, cellCount) {
     const dateKey = `${year}-${month + 1}-${day}`;
     cell.setAttribute('data-date', dateKey);
     
-    const schedules = ensureScheduleMeta(dateKey, generateSchedulesForDate(cellDate));
+    let schedules = scheduleByDate.get(dateKey);
+    if (!Array.isArray(schedules)) {
+        schedules = ensureScheduleMeta(dateKey, []);
+        scheduleByDate.set(dateKey, schedules);
+    } else {
+        schedules = ensureScheduleMeta(dateKey, schedules);
+        scheduleByDate.set(dateKey, schedules);
+    }
     const planHTML = createPlanHTML(dateKey, schedules);
-
-    // cache for detail panel
-    scheduleByDate.set(dateKey, schedules);
-    const weather = `${Math.floor(Math.random() * 5) - 5}-${Math.floor(Math.random() * 10) + 5}˚`;
-    weatherByDate.set(dateKey, weather);
+    // Weather is not loaded yet; avoid dummy values.
+    const weatherHTML = '';
     
     cell.innerHTML = `
     <div class="topic">
     <h5>${day}</h5>
-    <h6 class="cont-weather">${weather}</h6>
+    ${weatherHTML}
     </div>
     ${planHTML}
     `;
@@ -696,12 +929,18 @@ function setupPopupToggles() {
     const openPopup = (popupId) => {
         const overlay = document.getElementById(popupId);
         if (!overlay) return;
+        overlay.classList.remove('is-suspended');
         overlay.classList.add('is-open');
     };
 
     const closePopup = (overlay) => {
         if (!overlay) return;
         overlay.classList.remove('is-open');
+
+        // If we opened detail from overlap list, restore it when detail closes
+        if (overlay === detailOverlay && overlapOverlay && overlapOverlay.classList.contains('is-open')) {
+            overlapOverlay.classList.remove('is-suspended');
+        }
     };
 
     const planAddBtn = document.getElementById('planADD');
@@ -712,18 +951,72 @@ function setupPopupToggles() {
     const addOverlay = document.getElementById('addSchedulePopup');
     const detailOverlay = document.getElementById('detailSchedulePopup');
     const deleteOverlay = document.getElementById('deleteConfirmPopup');
+    const overlapOverlay = document.getElementById('overlapListPopup');
 
     const addName = document.getElementById('scheduleName');
     const addDate = document.getElementById('scheduleDate');
     const addStart = document.getElementById('scheduleStart');
     const addEnd = document.getElementById('scheduleEnd');
+    const addAllDay = document.getElementById('scheduleAllDay');
+    const addDateUnset = document.getElementById('scheduleDateUnset');
 
     const addNameOptions = document.getElementById('scheduleNameOptions');
     const relatedTasksTable = document.getElementById('relatedTasksTable');
+    const taskSuggestBtn = document.getElementById('taskSuggestBtn');
+    const taskSuggestBox = addOverlay ? addOverlay.querySelector('.taskSuggest') : null;
+
+    const detailTaskSuggestBox = detailOverlay ? detailOverlay.querySelector('#detailTaskSuggest') : null;
+    const detailTaskSuggestBtn = document.getElementById('detailTaskSuggestBtn');
+    const detailRelatedTasksTable = document.getElementById('detailRelatedTasksTable');
     const detailName = document.getElementById('detailName');
     const detailDate = document.getElementById('detailDate');
     const detailStart = document.getElementById('detailStart');
     const detailEnd = document.getElementById('detailEnd');
+
+    const applyAddDateTimeToggleState = () => {
+        const isUndated = !!addDateUnset?.checked;
+        const isAllDay = !!addAllDay?.checked;
+
+        if (addDate) {
+            addDate.disabled = isUndated;
+            if (isUndated) addDate.value = '';
+        }
+
+        if (addAllDay) {
+            addAllDay.disabled = isUndated;
+            if (isUndated) addAllDay.checked = true;
+        }
+
+        const disableTime = isUndated || isAllDay;
+        if (addStart) {
+            addStart.disabled = disableTime;
+            if (disableTime) addStart.value = '';
+        }
+        if (addEnd) {
+            addEnd.disabled = disableTime;
+            if (disableTime) addEnd.value = '';
+        }
+    };
+
+    const collapseTaskSuggest = () => {
+        if (!taskSuggestBox) return;
+        taskSuggestBox.classList.add('is-collapsed');
+    };
+
+    const expandTaskSuggest = () => {
+        if (!taskSuggestBox) return;
+        taskSuggestBox.classList.remove('is-collapsed');
+    };
+
+    const collapseDetailTaskSuggest = () => {
+        if (!detailTaskSuggestBox) return;
+        detailTaskSuggestBox.classList.add('is-collapsed');
+    };
+
+    const expandDetailTaskSuggest = () => {
+        if (!detailTaskSuggestBox) return;
+        detailTaskSuggestBox.classList.remove('is-collapsed');
+    };
 
     const rebuildAddNameOptions = () => {
         if (!addNameOptions) return;
@@ -747,6 +1040,291 @@ function setupPopupToggles() {
         if (addOverlay) addOverlay.dataset.relatedTasks = JSON.stringify(tasks || []);
     };
 
+    const setDetailRelatedTasks = (tasks) => {
+        if (!detailRelatedTasksTable) return;
+        const tbody = detailRelatedTasksTable.querySelector('tbody');
+        if (!tbody) return;
+        tbody.innerHTML = buildPlainTasksRows(tasks);
+        if (detailOverlay) detailOverlay.dataset.relatedTasks = JSON.stringify(tasks || []);
+    };
+
+    const getRecentScheduleNames = () => {
+        try {
+            const raw = JSON.parse(localStorage.getItem(RECENT_SCHEDULE_NAMES_KEY) || '[]');
+            if (!Array.isArray(raw)) return [];
+            return raw
+                .map((s) => String(s || '').trim())
+                .filter(Boolean)
+                .slice(0, 12);
+        } catch {
+            return [];
+        }
+    };
+
+    const pushRecentScheduleName = (name) => {
+        const n = String(name || '').trim();
+        if (!n) return;
+        const list = getRecentScheduleNames();
+        const next = [n, ...list.filter((x) => x !== n)].slice(0, 12);
+        try {
+            localStorage.setItem(RECENT_SCHEDULE_NAMES_KEY, JSON.stringify(next));
+        } catch {
+            // ignore
+        }
+    };
+
+    const getOpenAIApiKey = () => {
+        try {
+            const fromGlobal = String(window.__P_CALENDAR_OPENAI_API_KEY__ || '').trim();
+            if (fromGlobal) return fromGlobal;
+            return String(localStorage.getItem(OPENAI_API_KEY_STORAGE) || '').trim();
+        } catch {
+            return '';
+        }
+    };
+
+    const ensureOpenAIApiKey = () => {
+        const existing = getOpenAIApiKey();
+        if (existing) return existing;
+        // NOTE: Storing API keys in the browser is not secure. For production, proxy this via a server.
+        const input = window.prompt('OpenAI API Key를 입력해주세요 (브라우저에만 저장됩니다)');
+        const key = String(input || '').trim();
+        if (!key) return '';
+        try {
+            localStorage.setItem(OPENAI_API_KEY_STORAGE, key);
+        } catch {
+            // ignore
+        }
+        return key;
+    };
+
+    const parseGptTasks = (text) => {
+        const raw = String(text || '').trim();
+        if (!raw) return [];
+
+        const normalizeTasks = (arr) => {
+            if (!Array.isArray(arr)) return [];
+            return arr
+                .map((t) => ({
+                    title: String(t?.title ?? '').trim(),
+                    due: String(t?.due ?? '').trim(),
+                }))
+                .filter((t) => t.title)
+                .slice(0, 10);
+        };
+
+        const tryParseJSON = (candidate) => {
+            const s = String(candidate || '').trim();
+            if (!s) return null;
+            // Remove common JSON mistakes: trailing commas
+            const cleaned = s.replace(/,\s*([}\]])/g, '$1');
+            try {
+                return JSON.parse(cleaned);
+            } catch {
+                return null;
+            }
+        };
+
+        const stripCodeFences = (s) => {
+            const t = String(s || '').trim();
+            if (!t) return '';
+            if (!t.startsWith('```')) return t;
+            // Remove first ```... line and last ```
+            return t
+                .replace(/^```[a-zA-Z0-9_-]*\s*/m, '')
+                .replace(/```\s*$/m, '')
+                .trim();
+        };
+
+        const candidates = [];
+        candidates.push(raw);
+        candidates.push(stripCodeFences(raw));
+
+        // If response contains an array somewhere, extract it
+        const noFence = stripCodeFences(raw);
+        const firstArr = noFence.indexOf('[');
+        const lastArr = noFence.lastIndexOf(']');
+        if (firstArr !== -1 && lastArr !== -1 && lastArr > firstArr) {
+            candidates.push(noFence.slice(firstArr, lastArr + 1));
+        }
+
+        // If response contains objects per line without array wrapper
+        if (noFence.includes('{') && noFence.includes('"title"') && !noFence.includes('[')) {
+            const objLines = noFence
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter(Boolean)
+                .map((l) => l.replace(/,$/, ''));
+            if (objLines.length) {
+                candidates.push('[' + objLines.join(',') + ']');
+            }
+        }
+
+        for (const c of candidates) {
+            const parsed = tryParseJSON(c);
+            if (!parsed) continue;
+            const arr = Array.isArray(parsed) ? parsed : parsed?.tasks;
+            const normalized = normalizeTasks(arr);
+            if (normalized.length) return normalized;
+        }
+
+        // Fallback 1: parse per-line JSON objects
+        const lines = noFence
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+        const lineObjects = [];
+        for (const l of lines) {
+            if (!l.includes('{') || !l.includes('"title"')) continue;
+            const obj = tryParseJSON(l.replace(/,$/, ''));
+            if (obj && typeof obj === 'object') lineObjects.push(obj);
+        }
+        const normalizedLineObjects = normalizeTasks(lineObjects);
+        if (normalizedLineObjects.length) return normalizedLineObjects;
+
+        // Fallback 2: plain text lines
+        const plain = lines
+            .map((l) => l.replace(/^\s*[-*\d.]+\s*/, '').trim())
+            .filter(Boolean);
+        return plain.slice(0, 10).map((l) => ({ title: l, due: '' }));
+    };
+
+    let activeSuggestAbort = null;
+
+    const setSuggestLoading = (btn, isLoading) => {
+        if (!btn) return;
+        btn.disabled = !!isLoading;
+        if (isLoading) {
+            btn.dataset.label = btn.dataset.label || btn.textContent || '';
+            btn.textContent = '추천 중...';
+        } else {
+            const label = btn.dataset.label;
+            if (label) btn.textContent = label;
+        }
+    };
+
+    const suggestTasksViaGPTFor = async (name, loadingBtn, baseDateKey) => {
+        const cleanName = String(name ?? '').trim();
+        if (!cleanName) return null;
+
+        const apiKey = ensureOpenAIApiKey();
+        if (!apiKey) return null;
+
+        if (activeSuggestAbort) activeSuggestAbort.abort();
+        activeSuggestAbort = new AbortController();
+
+        const recentNames = getRecentScheduleNames().filter((n) => n !== cleanName).slice(0, 8);
+        const baseKey = baseDateKey && baseDateKey !== UNDATED_DATE_KEY ? baseDateKey : null;
+        const baseIso = baseKey ? dateKeyToISO(baseKey) : '';
+
+const system =
+  'You are a deterministic todo-suggestion engine for a personal calendar. ' +
+  'You may suggest due dates ONLY for a small subset of todos when it is clearly necessary. ' +
+  'You must NOT schedule all todos or distribute dates evenly. ' +
+  'Return ONLY valid JSON with no extra text.';
+
+
+
+const user =
+  `일정명: "${cleanName}"\n` +
+  (baseIso ? `일정 날짜(D-day): ${baseIso}\n` : '일정 날짜(D-day): (날짜 미정)\n') +
+  '먼저 일정명의 핵심 문제 성격을 한 단어로 내부적으로 해석한다.\n' +
+  '문제 성격 예시는 건강, 생활습관, 감정, 교육, 업무, 서비스 기획 등이다.\n' +
+  '연관 할일은 해당 문제 성격을 반영한 관점의 대표 행동이어야 한다.\n' +
+  '위 정보를 참고해서 연관 할일 7개를 제안해줘.\n' +
+  '각 할일은 이 일정이 없으면 하지 않을 행동이어야 한다.\n' +
+  '의미가 겹치는 할일은 하나로 묶어 제안한다.\n' +
+  '각 할일은 지금 바로 체크할 수 있는 1단계 행동이어야 한다.\n' +
+  '검색, 확인, 선택, 신청, 접속, 작성 같은 즉시 행동만 허용한다.\n' +
+  '\n' +
+  '날짜(due) 규칙:\n' +
+  '- 날짜는 반드시 필요한 할일에만 최대 3개까지 제안한다.\n' +
+  '- 날짜가 없는 할일은 due를 ""로 둔다.\n' +
+  '- 날짜가 있는 경우에만 "D-숫자 HH:MM" 형식을 사용한다.\n' +
+  '- 모든 할일에 날짜를 부여하는 것은 금지한다.\n' +
+  '\n출력 형식(반드시 JSON만):\n' +
+  '[{"title":"할일","due":""}]\n' +
+  '- title은 12자 내외, 동사+목적어 형태\n' +
+  '- 추상적인 표현 금지\n' +
+  '- 일정과 직접 관련 없는 행동 금지\n' +
+  '- 정확히 7개';
+
+
+
+        setSuggestLoading(loadingBtn, true);
+        try {
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    temperature: 0.7,
+                    max_tokens: 400,
+                    messages: [
+                        { role: 'system', content: system },
+                        { role: 'user', content: user },
+                    ],
+                }),
+                signal: activeSuggestAbort.signal,
+            });
+
+            if (!res.ok) {
+                // Try to surface a readable error
+                let msg = '';
+                try {
+                    const data = await res.json();
+                    msg = data?.error?.message ? String(data.error.message) : '';
+                } catch {
+                    // ignore
+                }
+                throw new Error(msg || `OpenAI 요청 실패 (HTTP ${res.status})`);
+            }
+
+            const data = await res.json();
+            const content = data?.choices?.[0]?.message?.content || '';
+            const tasks = parseGptTasks(content).map((t) => ({
+                title: String(t?.title ?? '').trim(),
+                due: resolveTaskDueString(t?.due, baseKey) || String(t?.due ?? '').trim(),
+            }));
+            if (tasks.length) return tasks;
+            throw new Error('추천 결과를 파싱하지 못했어요');
+        } finally {
+            setSuggestLoading(loadingBtn, false);
+        }
+    };
+
+    const suggestRelatedTasks = async () => {
+        // Prefer template if exact match exists (keeps the previous UX)
+        const template = getTemplateByName(addName?.value);
+        if (template) {
+            expandTaskSuggest();
+            applyTemplateToAddForm(template);
+            return;
+        }
+
+        try {
+            const selectedDateKey = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
+            const baseDateKey = addDateUnset?.checked
+                ? null
+                : isoToDateKey(addDate?.value) || selectedDateKey || null;
+            const tasks = await suggestTasksViaGPTFor(String(addName?.value ?? '').trim(), taskSuggestBtn, baseDateKey);
+            if (tasks && tasks.length) {
+                expandTaskSuggest();
+                setRelatedTasks(tasks);
+                return;
+            }
+        } catch (e) {
+            // If GPT fails, fall back to empty list (no dummy)
+            console.warn(e);
+        }
+
+        expandTaskSuggest();
+            setRelatedTasks([]);
+    };
+
     const applyTemplateToAddForm = (template) => {
         if (!template) return;
         const { iso, start, end } = templateDeadlineToISO(template);
@@ -761,24 +1339,160 @@ function setupPopupToggles() {
         if (template) {
             applyTemplateToAddForm(template);
         } else {
-            setRelatedTasks(ADD_SCHEDULE_DEFAULT_TASKS);
+            setRelatedTasks([]);
         }
+    };
+
+    let taskSuggestTimer = null;
+    let lastSuggestedSignature = '';
+    let suggestingSignature = '';
+
+    const clearTaskSuggestTimer = () => {
+        if (taskSuggestTimer) {
+            clearTimeout(taskSuggestTimer);
+            taskSuggestTimer = null;
+        }
+    };
+
+    const getAddSuggestBaseDateKey = () => {
+        const selectedDateKey = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
+        return addDateUnset?.checked ? null : isoToDateKey(addDate?.value) || selectedDateKey || null;
+    };
+
+    const getAddSuggestSignature = () => {
+        const name = String(addName?.value ?? '').trim();
+        const baseDateKey = getAddSuggestBaseDateKey() || '';
+        const undated = addDateUnset?.checked ? 'U' : '';
+        return `${name}||${undated}||${baseDateKey}`;
+    };
+
+    const runSuggestIfNeeded = async ({ force } = { force: false }) => {
+        const name = String(addName?.value ?? '').trim();
+        if (!name) return;
+
+        const sig = getAddSuggestSignature();
+        if (!force) {
+            if (sig && sig === lastSuggestedSignature) return;
+            if (sig && sig === suggestingSignature) return;
+        }
+
+        suggestingSignature = sig;
+        expandTaskSuggest();
+        try {
+            await suggestRelatedTasks();
+            lastSuggestedSignature = sig;
+        } finally {
+            suggestingSignature = '';
+        }
+    };
+
+    const scheduleAutoTaskSuggest = () => {
+        clearTaskSuggestTimer();
+        taskSuggestTimer = setTimeout(() => {
+            runSuggestIfNeeded({ force: false });
+            clearTaskSuggestTimer();
+        }, 5000);
+    };
+
+    const markTaskSuggestAction = () => {
+        // Don't reset lastSuggestedSignature here; only re-suggest when signature changes.
+        scheduleAutoTaskSuggest();
     };
     const detailDone = document.getElementById('detailDone');
 
         planAddBtn.addEventListener('click', () => {
             const selectedDateKey = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
             if (addDate && selectedDateKey) addDate.value = dateKeyToISO(selectedDateKey);
+            if (addAllDay) addAllDay.checked = false;
+            if (addDateUnset) addDateUnset.checked = false;
+            applyAddDateTimeToggleState();
             rebuildAddNameOptions();
-            setRelatedTasks(ADD_SCHEDULE_DEFAULT_TASKS);
+            setRelatedTasks([]);
+            clearTaskSuggestTimer();
+            lastSuggestedSignature = '';
+            suggestingSignature = '';
+            collapseTaskSuggest();
             openPopup('addSchedulePopup');
         });
 
 
     if (addName) {
-        addName.addEventListener('input', refreshAddFormByName);
-        addName.addEventListener('change', refreshAddFormByName);
-        addName.addEventListener('blur', refreshAddFormByName);
+        addName.addEventListener('input', markTaskSuggestAction);
+        addName.addEventListener('change', markTaskSuggestAction);
+        addName.addEventListener('keydown', markTaskSuggestAction);
+        addName.addEventListener('paste', markTaskSuggestAction);
+        addName.addEventListener('focus', () => {
+            // Focus-idle UX: if user focuses and does nothing for 5s, suggest once.
+            scheduleAutoTaskSuggest();
+        });
+        addName.addEventListener('blur', () => {
+            clearTaskSuggestTimer();
+            // Don't reveal / refresh suggestions just by blur.
+            // If the table is already expanded (user requested), keep it in sync.
+            if (taskSuggestBox && !taskSuggestBox.classList.contains('is-collapsed')) {
+                refreshAddFormByName();
+            }
+        });
+    }
+
+    if (taskSuggestBtn) {
+        taskSuggestBtn.addEventListener('click', () => {
+            clearTaskSuggestTimer();
+            runSuggestIfNeeded({ force: true });
+        });
+    }
+
+    if (addAllDay) {
+        addAllDay.addEventListener('change', () => {
+            applyAddDateTimeToggleState();
+            markTaskSuggestAction();
+        });
+    }
+    if (addDateUnset) {
+        addDateUnset.addEventListener('change', () => {
+            applyAddDateTimeToggleState();
+            markTaskSuggestAction();
+        });
+    }
+    if (addDate) {
+        addDate.addEventListener('change', markTaskSuggestAction);
+        addDate.addEventListener('input', markTaskSuggestAction);
+    }
+
+    const suggestDetailRelatedTasks = async () => {
+        const name = String(detailName?.value ?? '').trim();
+        if (!name) return;
+
+        try {
+            const baseDateKey = isoToDateKey(detailDate?.value) || (detailOverlay?.dataset?.dateKey || null);
+            const tasks = await suggestTasksViaGPTFor(name, detailTaskSuggestBtn, baseDateKey);
+            if (tasks && tasks.length) {
+                expandDetailTaskSuggest();
+                setDetailRelatedTasks(tasks);
+
+                // Persist into the schedule model
+                const dateKey = detailOverlay?.dataset?.dateKey;
+                const scheduleId = detailOverlay?.dataset?.scheduleId;
+                const schedule = dateKey && scheduleId ? findScheduleById(dateKey, scheduleId) : null;
+                if (schedule) {
+                    schedule.relatedTasks = tasks;
+                    saveSchedulesToStorage();
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn(e);
+        }
+
+        expandDetailTaskSuggest();
+        setDetailRelatedTasks([]);
+    };
+
+    if (detailTaskSuggestBtn) {
+        detailTaskSuggestBtn.addEventListener('click', () => {
+            expandDetailTaskSuggest();
+            suggestDetailRelatedTasks();
+        });
     }
     const openDetailPopupFor = (dateKey, scheduleId) => {
         if (!detailOverlay) return;
@@ -794,7 +1508,83 @@ function setupPopupToggles() {
         if (detailEnd) detailEnd.value = hourToTimeInput(schedule?.time?.end);
         if (detailDone) detailDone.checked = !!schedule?.isDone;
 
-        open_bot('detailSchedulePopup');
+        // Detail task suggest: start collapsed, hydrate existing tasks (but keep hidden until user clicks)
+        collapseDetailTaskSuggest();
+        try {
+            const tasks = Array.isArray(schedule?.relatedTasks) ? schedule.relatedTasks : [];
+            setDetailRelatedTasks(tasks);
+        } catch {
+            setDetailRelatedTasks([]);
+        }
+
+        openPopup('detailSchedulePopup');
+    };
+
+    const formatHourLabel = (hourValue) => {
+        const h = Number(hourValue);
+        if (Number.isNaN(h)) return '';
+        if (h >= 24) return '24:00';
+        if (h < 0) return '00:00';
+        return `${pad2(h)}:00`;
+    };
+
+    const openOverlapPopup = (dateKey, startHour, endHour) => {
+        if (!overlapOverlay) return;
+        const rangeEl = overlapOverlay.querySelector('[data-role="range"]');
+        const listEl = overlapOverlay.querySelector('.overlapList');
+        if (!listEl) return;
+
+        const segStart = Number(startHour);
+        const segEnd = Number(endHour);
+
+        const schedules = scheduleByDate.get(dateKey) || [];
+        const items = (schedules || [])
+            .map((s) => {
+                const sStartRaw = toHour(s?.time?.start);
+                const sEndRaw = toHour(s?.time?.end);
+                if (sStartRaw == null || sEndRaw == null) return null;
+
+                let sEnd = sEndRaw;
+                if (sEnd <= sStartRaw) sEnd = sStartRaw + 1;
+
+                return {
+                    id: s?.id,
+                    title: String(s?.type ?? '').trim(),
+                    start: sStartRaw,
+                    end: sEnd,
+                    isDone: !!s?.isDone,
+                };
+            })
+            .filter(Boolean)
+            .filter((s) => s.id && s.title && s.start < segEnd && s.end > segStart)
+            .sort((a, b) => {
+                if (a.start !== b.start) return a.start - b.start;
+                return a.end - b.end;
+            });
+
+        if (rangeEl) {
+            rangeEl.textContent = `${dateKey} · ${formatHourLabel(segStart)} ~ ${formatHourLabel(segEnd)}`;
+        }
+
+        if (!items.length) {
+            listEl.innerHTML = '<li class="overlapEmpty">겹친 일정이 없어요</li>';
+        } else {
+            listEl.innerHTML = items
+                .map((s) => {
+                    const doneClass = s.isDone ? ' type-done' : '';
+                    return `
+                        <li>
+                            <button type="button" class="overlapItem${doneClass}" data-date="${dateKey}" data-id="${s.id}">
+                                <span class="title">${s.title}</span>
+                                <span class="time">${pad2(s.start)}~${pad2(Math.min(24, s.end))}</span>
+                            </button>
+                        </li>
+                    `;
+                })
+                .join('');
+        }
+
+        openPopup('overlapListPopup');
     };
 
     const extractScheduleKeyFromPlanItem = (planItem) => {
@@ -843,18 +1633,59 @@ function setupPopupToggles() {
         openDetailPopupFor(dateKey, scheduleId);
     });
 
+    // +more (overlaps) popup
+    document.addEventListener('click', (e) => {
+        const moreBlock = e.target.closest('.moreBlock');
+        if (!moreBlock) return;
+        if (moreBlock.closest('.popup-overlay')) return;
+
+        const dateKey =
+            moreBlock.getAttribute('data-date') ||
+            moreBlock.closest('.detailGrid[data-date]')?.getAttribute('data-date') ||
+            null;
+        const startHour = parseInt(moreBlock.getAttribute('data-start-hour') || '', 10);
+        const endHour = parseInt(moreBlock.getAttribute('data-end-hour') || '', 10);
+        if (!dateKey || Number.isNaN(startHour) || Number.isNaN(endHour)) return;
+
+        openOverlapPopup(dateKey, startHour, endHour);
+    });
+
+    if (overlapOverlay) {
+        overlapOverlay.addEventListener('click', (e) => {
+            const btn = e.target.closest('.overlapItem');
+            if (!btn) return;
+            const dateKey = btn.getAttribute('data-date');
+            const scheduleId = btn.getAttribute('data-id');
+            if (!dateKey || !scheduleId) return;
+            // Keep the list popup alive so user can return after closing detail
+            overlapOverlay.classList.add('is-suspended');
+            openDetailPopupFor(dateKey, scheduleId);
+        });
+    }
+
     // Add schedule (demo/in-memory)
     if (addOverlay) {
         const addConfirm = addOverlay.querySelector('.btn-confirm');
         if (addConfirm) {
             addConfirm.addEventListener('click', () => {
+                const isUndated = !!addDateUnset?.checked;
                 const iso = addDate?.value || '';
-                const dateKey = isoToDateKey(iso) || document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
+                const dateKey =
+                    (isUndated ? UNDATED_DATE_KEY : isoToDateKey(iso)) ||
+                    (!isUndated
+                        ? document
+                              .querySelector('#calendarContainer .calSell.is-selected')
+                              ?.getAttribute('data-date')
+                        : null);
                 if (!dateKey) return;
 
                 const type = String(addName?.value || '').trim() || '새 일정';
-                const start = timeInputToHourString(addStart?.value) || '09';
-                const end = timeInputToHourString(addEnd?.value) || '10';
+                pushRecentScheduleName(type);
+                const isAllDay = !!addAllDay?.checked || isUndated;
+                const start = isAllDay ? '' : timeInputToHourString(addStart?.value);
+                const end = isAllDay ? '' : timeInputToHourString(addEnd?.value);
+                const hasTime = !isAllDay && !!start && !!end;
+                const time = hasTime ? { start, end } : null;
 
                 const relatedTasks = [];
                 try {
@@ -884,7 +1715,7 @@ function setupPopupToggles() {
                 const newSchedule = appendScheduleToDate(dateKey, {
                     id: `s${scheduleSequence++}`,
                     type,
-                    time: { start, end },
+                    time,
                     isDone: false,
                     relatedTasks,
                 });
@@ -894,15 +1725,16 @@ function setupPopupToggles() {
                     const taskTitle = String(task?.title ?? '').trim();
                     if (!taskTitle) return;
 
-                    const due = parseTaskDueToDateKeyAndTime(task?.due);
+                    const due = parseTaskDueToDateKeyAndTime(task?.due, dateKey);
                     const targetDateKey = due?.dateKey || dateKey;
-                    const tStart = due?.start || start;
-                    const tEnd = due?.end || end;
+                    const tStart = due?.start || (hasTime ? start : null);
+                    const tEnd = due?.end || (hasTime ? end : null);
+                    const tHasTime = !!tStart && !!tEnd;
 
                     appendScheduleToDate(targetDateKey, {
                         id: `s${scheduleSequence++}`,
                         type: taskTitle,
-                        time: { start: tStart, end: tEnd },
+                        time: tHasTime ? { start: tStart, end: tEnd } : null,
                         isDone: false,
                         parentScheduleId: newSchedule?.id || null,
                     });
@@ -910,12 +1742,31 @@ function setupPopupToggles() {
 
                 const selected = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
                 touchedDateKeys.forEach((k) => updateCalendarCellPlan(k));
-                if (selected && touchedDateKeys.has(selected)) renderDetailForDate(selected);
+                // Always refresh the detail for the date we just added to (if it exists in the calendar).
+                if (dateKey && dateKey !== UNDATED_DATE_KEY) {
+                    const container = document.getElementById('calendarContainer');
+                    const exists = !!container?.querySelector(`.calSell[data-date="${dateKey}"]`);
+                    if (exists) {
+                        selectCalendarCell(dateKey);
+                        renderDetailForDate(dateKey);
+                    } else if (selected && touchedDateKeys.has(selected)) {
+                        renderDetailForDate(selected);
+                    }
+                } else if (selected && touchedDateKeys.has(selected)) {
+                    renderDetailForDate(selected);
+                }
+                if (touchedDateKeys.has(UNDATED_DATE_KEY)) renderUndatedPanel();
+
+                saveSchedulesToStorage();
 
                 if (addName) addName.value = '';
                 if (addStart) addStart.value = '';
                 if (addEnd) addEnd.value = '';
-                setRelatedTasks(ADD_SCHEDULE_DEFAULT_TASKS);
+                if (addAllDay) addAllDay.checked = false;
+                if (addDateUnset) addDateUnset.checked = false;
+                applyAddDateTimeToggleState();
+                setRelatedTasks([]);
+                collapseTaskSuggest();
                 closePopup(addOverlay);
             });
         }
@@ -935,15 +1786,18 @@ function setupPopupToggles() {
 
                 const nextDateKey = isoToDateKey(detailDate?.value) || oldDateKey;
                 const nextType = String(detailName?.value || '').trim() || schedule.type;
-                const nextStart = timeInputToHourString(detailStart?.value) || pad2(toHour(schedule?.time?.start) ?? '');
-                const nextEnd = timeInputToHourString(detailEnd?.value) || pad2(toHour(schedule?.time?.end) ?? '');
+                const inputStart = timeInputToHourString(detailStart?.value);
+                const inputEnd = timeInputToHourString(detailEnd?.value);
+                const wantsNoTime = !inputStart || !inputEnd;
+                const nextStart = wantsNoTime ? null : inputStart;
+                const nextEnd = wantsNoTime ? null : inputEnd;
                 const nextDone = !!detailDone?.checked;
 
                 schedule.type = nextType;
-                schedule.time = schedule.time || {};
-                schedule.time.start = nextStart;
-                schedule.time.end = nextEnd;
+                schedule.time = wantsNoTime ? null : { start: nextStart, end: nextEnd };
                 schedule.isDone = nextDone;
+
+                const selected = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
 
                 if (nextDateKey !== oldDateKey) {
                     const oldList = (scheduleByDate.get(oldDateKey) || []).filter((s) => String(s?.id) !== String(scheduleId));
@@ -956,13 +1810,27 @@ function setupPopupToggles() {
 
                     updateCalendarCellPlan(oldDateKey);
                     updateCalendarCellPlan(nextDateKey);
-                    selectCalendarCell(nextDateKey);
-                    renderDetailForDate(nextDateKey);
+                    if (oldDateKey === UNDATED_DATE_KEY || nextDateKey === UNDATED_DATE_KEY) {
+                        renderUndatedPanel();
+                    }
+                    if (nextDateKey !== UNDATED_DATE_KEY) {
+                        selectCalendarCell(nextDateKey);
+                        renderDetailForDate(nextDateKey);
+                    } else if (selected) {
+                        renderDetailForDate(selected);
+                    }
                     detailOverlay.dataset.dateKey = nextDateKey;
                 } else {
                     updateCalendarCellPlan(oldDateKey);
-                    renderDetailForDate(oldDateKey);
+                    if (oldDateKey === UNDATED_DATE_KEY) {
+                        renderUndatedPanel();
+                        if (selected) renderDetailForDate(selected);
+                    } else {
+                        renderDetailForDate(oldDateKey);
+                    }
                 }
+
+                saveSchedulesToStorage();
 
                 closePopup(detailOverlay);
             });
@@ -973,7 +1841,7 @@ function setupPopupToggles() {
             deleteBtn.addEventListener('click', () => {
                 deleteOverlay.dataset.dateKey = detailOverlay.dataset.dateKey || '';
                 deleteOverlay.dataset.scheduleId = detailOverlay.dataset.scheduleId || '';
-                open_bot('deleteConfirmPopup');
+                openPopup('deleteConfirmPopup');
             });
         }
     }
@@ -994,7 +1862,13 @@ function setupPopupToggles() {
                 );
 
                 updateCalendarCellPlan(dateKey);
-                renderDetailForDate(dateKey);
+                if (dateKey === UNDATED_DATE_KEY) {
+                    renderUndatedPanel();
+                } else {
+                    renderDetailForDate(dateKey);
+                }
+
+                saveSchedulesToStorage();
 
                 closePopup(deleteOverlay);
                 if (detailOverlay) closePopup(detailOverlay);
@@ -1014,12 +1888,18 @@ function setupPopupToggles() {
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        document.querySelectorAll('.popup-overlay.is-open').forEach(closePopup);
+        const openOverlays = Array.from(document.querySelectorAll('.popup-overlay.is-open')).filter(
+            (el) => !el.classList.contains('is-suspended')
+        );
+        if (!openOverlays.length) return;
+        closePopup(openOverlays[openOverlays.length - 1]);
     });
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    loadSchedulesFromStorage();
     generateCalendar();
     setupPopupToggles();
+    saveSchedulesToStorage();
 });

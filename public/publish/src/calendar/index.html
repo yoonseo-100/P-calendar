@@ -51,7 +51,13 @@
             </div>
             <div class="form-group">
                 <label>날짜</label>
-                <input type="date" id="scheduleDate">
+                <div class="dateRow">
+                    <input type="date" id="scheduleDate">
+                    <div class="dateExtras">
+                        <label class="check"><input type="checkbox" id="scheduleAllDay">하루종일</label>
+                        <label class="check"><input type="checkbox" id="scheduleDateUnset">날짜 미정</label>
+                    </div>
+                </div>
             </div>
             <div class="form-group">
                 <label>시간</label>
@@ -63,7 +69,10 @@
             </div>
 
             <div class="taskSuggest">
-                <h4>연관 할일 제안</h4>
+                <div class="taskSuggestHeader">
+                    <h4>연관 할일 제안</h4>
+                    <button type="button" class="taskSuggestBtn" id="taskSuggestBtn">할일 추천 받기</button>
+                </div>
                 <div class="taskTableWrap">
                     <table class="taskTable" id="relatedTasksTable">
                         <thead>
@@ -116,6 +125,25 @@
                     완료 표시
                 </label>
             </div>
+
+            <div class="taskSuggest is-collapsed" id="detailTaskSuggest">
+                <div class="taskSuggestHeader">
+                    <h4>연관 할일 제안</h4>
+                    <button type="button" class="taskSuggestBtn" id="detailTaskSuggestBtn">할일 추천 받기</button>
+                </div>
+                <div class="taskTableWrap">
+                    <table class="taskTable" id="detailRelatedTasksTable">
+                        <thead>
+                            <tr>
+                                <th>할일</th>
+                                <th class="col-due">마감</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <p class="taskHint">추천받기를 누르면 할일 목록이 표시됩니다.</p>
+            </div>
         </div>
         <div class="popup-footer">
             <button type="button" class="btn-delete">삭제</button>
@@ -139,8 +167,23 @@
         </div>
     </div>
 </div>
+
+<!-- Overlap Schedules List Popup -->
+<div class="popup-overlay" id="overlapListPopup">
+    <div class="popup-content">
+        <div class="popup-header">
+            <h3 class="overlapTitle">겹친 일정</h3>
+            <button type="button" class="close-btn">&times;</button>
+        </div>
+        <div class="popup-body">
+            <p class="overlapRange" data-role="range"></p>
+            <ul class="overlapList"></ul>
+        </div>
+    </div>
+</div>
 </div>
 </body>
+<script src="../../common/js/openaiKey.js"></script>
 <script src="../../common/js/calendar.js"></script>
 <script src="../../common/js/nav.js"></script>
 </html>
