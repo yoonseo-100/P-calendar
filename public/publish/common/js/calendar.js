@@ -280,7 +280,7 @@ function buildScheduleGridHTML(schedules, dateKey) {
 
     const rows = DETAIL_END_HOUR - DETAIL_START_HOUR + 1;
     const MORE_WIDTH = 40;
-    const MAX_VISIBLE_LANES = 3;
+    const MAX_VISIBLE_LANES = 2;
     let html = `<div class="scheduleGrid" style="--row-h:${DETAIL_ROW_HEIGHT}px; --rows:${rows}; --more-w:${MORE_WIDTH}px; --max-visible-lanes:${MAX_VISIBLE_LANES}">`;
 
     // grid lines
@@ -508,13 +508,13 @@ function generateSchedulesForDate(date) {
     let schedulesPerWeek;
     if (date < CURRENT_DATE) {
         // 과거 날짜: 3~8개
-        schedulesPerWeek = (Math.floor(Math.random() * 6) + 3)*1;
+        schedulesPerWeek = (Math.floor(Math.random() * 6) + 3)*0;
     } else if (date.toDateString() === CURRENT_DATE.toDateString()) {
         // 오늘: 3~8개
-        schedulesPerWeek = (Math.floor(Math.random() * 6) + 3 )*1;
+        schedulesPerWeek = (Math.floor(Math.random() * 6) + 3 )*0;
     } else {
         // 미래 날짜 (type-yet): 0개 70%, 1~2개 30%
-        schedulesPerWeek = (Math.random() < 0.9 ? 0 : Math.floor(Math.random() * 2) + 1)*1;
+        schedulesPerWeek = (Math.random() < 0.9 ? 0 : Math.floor(Math.random() * 2) + 1)*0;
     }
     
     let schedules = [];

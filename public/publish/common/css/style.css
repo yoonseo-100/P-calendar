@@ -1086,7 +1086,7 @@ section.loca-calendar .calendar .calRow.type-head {
     --gap-x: 2px;
     --more-w: 40px;
     --max-visible-lanes: 2;
-    /* 3 lanes + (lane gaps) + (gap to more) inside padded area */
+    /* 2 lanes + (lane gaps) + (gap to more) inside padded area */
     --lane-w: calc((100% - (var(--outer-pad) * 2) - var(--more-w) - (var(--gap-x) * (var(--max-visible-lanes) - 1)) - var(--gap-x)) / var(--max-visible-lanes));
 }
 
@@ -1118,22 +1118,20 @@ section.loca-calendar .calendar .calRow.type-head {
     width: var(--more-w);
     height: var(--height);
     border-radius: 12px;
-    border: 1px dashed rgba(0, 0, 0, 0.18);
-    background: rgba(0, 0, 0, 0.03);
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
     box-sizing: border-box;
-    color: rgba(0, 0, 0, 0.65);
     user-select: none;
 }
 
 .calendar + .detail .moreBlock .plus{
     font-size: 14px;
     line-height: 14px;
-    font-weight: 700;
 }
 
 .calendar + .detail .moreBlock .text{
