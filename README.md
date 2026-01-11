@@ -6,6 +6,8 @@ React 19 + Vite + Tailwind 기반의 감각 캘린더 실험 프로젝트입니�
 
 > 디자인 확인만 필요하면 아래 순서만 따르면 됩니다. 코드 수정은 `src/App.jsx` 와 `src/index.css` 정도만 보면 됩니다.
 
+**Vercel 배포 도메인:** www.y2k.run
+
 1. **Node 20+** 설치 (nvm 권장)
 2. GitHub 레포 클론
    ```bash
