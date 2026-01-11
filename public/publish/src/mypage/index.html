@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P Calendar - 마이페이지</title>
+    <link rel="stylesheet" href="../../common/css/reset.css">
+    <link rel="stylesheet" href="../../common/css/style.css">
+    <script src="../../common/js/jquery.min.js"></script>
+</head>
+
+<body>
+    <section class="frame loca-calendar loca-settings loca-mypage">
+        <header></header>
+        <nav id="appNav" data-active="mypage"></nav>
+
+        <div class="content">
+            <div class="settingsWrap">
+                <div class="settingsTop">
+                    <h2>마이페이지</h2>
+                    <p class="settingsSub">계정과 내 정보를 관리합니다</p>
+                </div>
+
+                <section class="settingsCard">
+                    <h3>내 정보</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>닉네임</h5>
+                            <p>캘린더에 표시되는 이름</p>
+                        </div>
+                        <input type="text" id="myNickname" class="settingsInput" placeholder="예) 포트북" value="">
+                    </div>
+                </section>
+
+                <section class="settingsCard">
+                    <h3>계정(전화번호)</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>연결된 전화번호</h5>
+                            <p>로그인/재인증에 사용됩니다</p>
+                        </div>
+                        <span class="settingsValue" id="myPhone">미인증</span>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>전화번호 변경</h5>
+                            <p>새 번호로 인증 후 변경</p>
+                        </div>
+                        <a class="settingsBtn" href="../auth/phone.html?flow=changePhone">변경하기</a>
+                    </div>
+                </section>
+
+                <section class="settingsCard">
+                    <h3>기본</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>로그아웃</h5>
+                            <p>현재 기기에서 로그아웃</p>
+                        </div>
+                        <button type="button" class="settingsBtn" id="btnLogout">로그아웃</button>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>버전</h5>
+                            <p>앱 정보</p>
+                        </div>
+                        <span class="settingsValue">v0.1</span>
+                    </div>
+                </section>
+
+                <div class="settingsBottom">
+                    <a class="settingsBack" href="../calendar/index.html">← 캘린더로 돌아가기</a>
+                    <button type="button" class="settingsPrimary" id="btnSaveMy">저장</button>
+                </div>
+            </div>
+        </div>
+
+        <footer></footer>
+    </section>
+</body>
+
+<script src="../../common/js/mypage.js"></script>
+<script src="../../common/js/nav.js"></script>
+
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POTEBOOK</title>
+    <link rel="stylesheet" href="../../common/css/reset.css">
+    <link rel="stylesheet" href="../../common/css/style.css">
+    <script src="../../common/js/jquery.min.js"></script>
+
+</head>
+
+<body >
+    <section class="frame loca-home">
+        <header></header>
+        <div class="content">
+
+            <h1 class="title">POTEBOOK</h1>
+            <a class="homeSettingsLink" href="../settings/index.html">설정</a>
+            <div class="formBox">
+                <div class="formItem style-design">
+                    <input type="text" placeholder="이름을 입력하세요">
+                    <label for="btnLogin" class="lblLogin"></label>
+                    <button class="btnLogin" id="btnLogin">→</button>
+                </div>
+            </div>
+            <div class="circleTable"></div>
+            <div class="todoList">
+                <div class="headBox">
+                    <div class="date"><h2><b>26/12/27 토</b>요일</h2></div>
+                </div>
+                <div class="contBox">
+                    <ul>
+                        <li>
+                            <a href="../auth/phone.html?flow=signup">
+                                <label for="todo1"><h4 class="text">회원가입 하기</h4></label>
+                                <span>→</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="../auth/phone.html?flow=find">
+                                <label for="todo1"><h4 class="text">계정 찾기</h4></label>
+                                <span>→</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="">
+                                <label for="todo1"><h4 class="text">개발진에게 물어보기</h4></label>
+                                <span>→</span>
+                            </a>
+                        </li>
+                    </ul>
+                    <a href="../calendar/index.html" class="detailBtn"><h4>그외 알아보기 →</h4></a>
+                </div>
+            </div>
+        </div>
+        <footer></footer>
+    </section>
+</body>
+<script src="../../common/js/clock.js"></script>
+
+<script src="../../common/js/login.js"></script>
+
+</html>

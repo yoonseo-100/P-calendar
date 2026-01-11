@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POTEBOOK - 전화번호 인증</title>
+  <link rel="stylesheet" href="../../common/css/reset.css" />
+  <link rel="stylesheet" href="../../common/css/style.css" />
+  <script src="../../common/js/jquery.min.js"></script>
+</head>
+
+<body>
+  <section class="frame loca-home">
+    <header></header>
+    <div class="content">
+      <h1 class="title">POTEBOOK</h1>
+
+      <div class="formBox">
+        <p class="formDesc"><span id="userName">사용자</span>님, 전화번호 인증을 진행해주세요.</p>
+
+        <div class="formItem type-center">
+          <input id="phoneInput" type="tel" inputmode="numeric" autocomplete="tel" placeholder="01012345678" />
+          <label for="phoneInput">전화번호</label>
+          <button type="button" id="btnSendCode">인증번호 받기</button>
+        </div>
+
+        <div class="formItem otpWrap type-otp" id="otpSection" aria-hidden="true">
+          <input id="otpInput" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="0000" maxlength="4" disabled />
+          <label for="otpInput">인증번호</label>
+          <button type="button" id="btnConfirm" disabled>확인</button>
+        </div>
+      </div>
+
+      <div class="circleTable"></div>
+    </div>
+    <footer></footer>
+  </section>
+</body>
+
+<script src="../../common/js/login.js"></script>
+
+</html>

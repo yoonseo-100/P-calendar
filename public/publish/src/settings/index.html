@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P Calendar - 설정</title>
+    <link rel="stylesheet" href="../../common/css/reset.css">
+    <link rel="stylesheet" href="../../common/css/style.css">
+    <script src="../../common/js/jquery.min.js"></script>
+</head>
+
+<body>
+    <section class="frame loca-calendar loca-settings">
+        <header></header>
+        <nav id="appNav" data-active="settings"></nav>
+
+        <div class="content">
+            <div class="settingsWrap">
+                <div class="settingsTop">
+                    <h2>설정</h2>
+                    <p class="settingsSub">기본 환경과 알림을 관리합니다</p>
+                </div>
+                <section class="settingsCard">
+                    <h3>캘린더 기본</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>주 시작 요일</h5>
+                            <p>캘린더에서 한 주의 시작</p>
+                        </div>
+                        <select class="settingsSelect">
+                            <option value="MON" selected>월요일</option>
+                            <option value="SUN">일요일</option>
+                        </select>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>기본 보기</h5>
+                            <p>앱에서 처음 보여줄 화면</p>
+                        </div>
+                        <select class="settingsSelect">
+                            <option selected>개인일정</option>
+                            <option>홈</option>
+                        </select>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>시간대</h5>
+                            <p>일정 시간 표기 기준</p>
+                        </div>
+                        <select class="settingsSelect">
+                            <option selected>Asia/Seoul (KST)</option>
+                            <option>UTC</option>
+                            <option>America/Los_Angeles (PST)</option>
+                            <option>Europe/London (GMT)</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="settingsCard">
+                    <h3>알림</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>일정 시작 알림</h5>
+                            <p>시작 10분 전에 알려줘요</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>오늘 요약</h5>
+                            <p>매일 오전 8시에 일정 요약</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>소리</h5>
+                            <p>알림 소리 재생</p>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="settingsCard">
+                    <h3>데이터</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>내보내기</h5>
+                            <p>일정 데이터를 파일로 저장</p>
+                        </div>
+                        <button type="button" class="settingsBtn">내보내기</button>
+                    </div>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>로컬 데이터 초기화</h5>
+                            <p>이 기기에서만 저장된 값 삭제</p>
+                        </div>
+                        <button type="button" class="settingsBtn danger">초기화</button>
+                    </div>
+                </section>
+
+
+                <section class="settingsCard">
+                    <h3>정보</h3>
+                    <div class="settingsItem">
+                        <div class="label">
+                            <h5>버전</h5>
+                            <p>앱 정보</p>
+                        </div>
+                        <span class="settingsValue">v0.1</span>
+                    </div>
+                </section>
+
+                <div class="settingsBottom">
+                    <a class="settingsBack" href="../calendar/index.html">← 캘린더로 돌아가기</a>
+                    <button type="button" class="settingsPrimary">변경사항 저장</button>
+                </div>
+            </div>
+        </div>
+
+        <footer></footer>
+    </section>
+</body>
+
+<script src="../../common/js/nav.js"></script>
+
+</html>

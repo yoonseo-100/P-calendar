@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POTEBOOK - 계정 찾기</title>
+  <link rel="stylesheet" href="../../common/css/reset.css" />
+  <link rel="stylesheet" href="../../common/css/style.css" />
+  <script src="../../common/js/jquery.min.js"></script>
+</head>
+
+<body>
+  <section class="frame loca-home">
+    <header></header>
+    <div class="content">
+      <h1 class="title">POTEBOOK</h1>
+
+      <div class="formBox">
+        <p class="formDesc">계정 찾기: 아래 6개의 이름 중 본인 이름을 선택해주세요.</p>
+
+        <div class="formItem">
+          <input type="hidden" id="pickedNameHidden" aria-hidden="true" />
+          <label for="pickedNameHidden">이름 선택</label>
+          <div class="formContent">
+            <div id="nameGrid" class="nameGrid" aria-label="이름 선택"></div>
+            <p class="formHint">(프로토타입) 선택하면 인증됩니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="circleTable"></div>
+    </div>
+    <footer></footer>
+  </section>
+</body>
+
+<script src="../../common/js/login.js"></script>
+
+</html>
