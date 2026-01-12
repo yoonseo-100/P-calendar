@@ -1,6 +1,60 @@
 (function () {
   'use strict';
 
+  const STORAGE_KEYS = {
+    userName: 'userName',
+    authFlow: 'authFlow',
+    verifiedPhone: 'verifiedPhone',
+    pickedName: 'pickedName',
+  };
+
+  const ROUTES = {
+    phone: (flow) => `../auth/phone.html?flow=${encodeURIComponent(flow || 'login')}`,
+    signup: () => '../auth/signup.html',
+    pickName: () => '../auth/pick-name.html',
+    calendar: () => '../calendar/index.html',
+    homeFirst: () => '../home/first.html',
+    mypage: () => '../mypage/index.html',
+  };
+
+  const DEFAULT_SETTINGS = {
+    strings: {
+      requireName: '이름을 입력해주세요',
+      requirePhone: '전화번호를 입력해주세요',
+      otpSent: '인증번호 발송됨',
+      requireOtp4: '인증번호 4자리를 모두 입력해주세요',
+      doneChangePhone: '전화번호 변경이 완료되었습니다',
+      doneReauth: '재인증이 완료되었습니다',
+      askSignup: '등록된 계정이 없습니다. 회원가입 하시겠어요?',
+      signupDone: '회원가입 완료',
+      requireTerms: '약관 동의가 필요합니다',
+      defaultUserName: '사용자',
+    },
+    mock: {
+      newUserPhones: ['01000000000'],
+    },
+    pickNameCandidates: ['김민지', '박서준', '이도현', '최유진', '정하늘', '홍길동'],
+  };
+
+  function getSettings() {
+    const fromGlobal = window.__P_LOGIN_SETTINGS__;
+    if (!fromGlobal || typeof fromGlobal !== 'object') return DEFAULT_SETTINGS;
+
+    return {
+      ...DEFAULT_SETTINGS,
+      ...fromGlobal,
+      strings: { ...DEFAULT_SETTINGS.strings, ...(fromGlobal.strings || {}) },
+      mock: { ...DEFAULT_SETTINGS.mock, ...(fromGlobal.mock || {}) },
+      pickNameCandidates: Array.isArray(fromGlobal.pickNameCandidates)
+        ? fromGlobal.pickNameCandidates
+        : DEFAULT_SETTINGS.pickNameCandidates,
+    };
+  }
+
+  function navigateTo(href) {
+    window.location.href = href;
+  }
+
   function normalizePhone(raw) {
     return String(raw || '').replace(/\D/g, '');
   }
@@ -16,7 +70,8 @@
   }
 
   function setupFirstPage() {
-    const nameInput = document.querySelector('input[type="text"]');
+    const settings = getSettings();
+    const nameInput = document.querySelector('.formItem input[type="text"]') || document.querySelector('input[type="text"]');
     const loginButton = document.querySelector('.btnLogin');
 
     if (!nameInput || !loginButton) return;
@@ -24,13 +79,13 @@
     const goNext = () => {
       const userName = (nameInput.value || '').trim();
       if (!userName) {
-        alert('이름을 입력해주세요');
+        alert(settings.strings.requireName);
         nameInput.focus();
         return;
       }
-      sessionStorage.setItem('userName', userName);
-      sessionStorage.setItem('authFlow', 'login');
-      location.href = '../auth/phone.html?flow=login';
+      sessionStorage.setItem(STORAGE_KEYS.userName, userName);
+      sessionStorage.setItem(STORAGE_KEYS.authFlow, 'login');
+      navigateTo(ROUTES.phone('login'));
     };
 
     loginButton.addEventListener('click', (e) => {
@@ -47,6 +102,7 @@
   }
 
   function setupPhonePage() {
+    const settings = getSettings();
     const phoneInput = document.getElementById('phoneInput');
     const sendButton = document.getElementById('btnSendCode');
     const otpSection = document.getElementById('otpSection');
@@ -57,12 +113,12 @@
     if (!phoneInput || !sendButton || !otpSection || !otpInput || !confirmButton) return;
 
     const flowFromUrl = getFlowFromUrl();
-    const flow = (flowFromUrl || sessionStorage.getItem('authFlow') || 'login').trim();
-    sessionStorage.setItem('authFlow', flow);
+    const flow = (flowFromUrl || sessionStorage.getItem(STORAGE_KEYS.authFlow) || 'login').trim();
+    sessionStorage.setItem(STORAGE_KEYS.authFlow, flow);
 
-    const storedName = (sessionStorage.getItem('userName') || '').trim();
+    const storedName = (sessionStorage.getItem(STORAGE_KEYS.userName) || '').trim();
     if (userNameSpan) {
-      userNameSpan.textContent = storedName ? storedName : '사용자';
+      userNameSpan.textContent = storedName ? storedName : settings.strings.defaultUserName;
     }
 
     function setOtpEnabled(enabled) {
@@ -77,14 +133,14 @@
     sendButton.addEventListener('click', () => {
       const phone = normalizePhone(phoneInput.value);
       if (!phone) {
-        alert('전화번호를 입력해주세요');
+        alert(settings.strings.requirePhone);
         phoneInput.focus();
         return;
       }
 
-      sessionStorage.setItem('verifiedPhone', phone);
+      sessionStorage.setItem(STORAGE_KEYS.verifiedPhone, phone);
 
-      sendButton.textContent = '인증번호 발송됨';
+      sendButton.textContent = settings.strings.otpSent;
       sendButton.disabled = true;
       setOtpEnabled(true);
 
@@ -107,53 +163,53 @@
     confirmButton.addEventListener('click', () => {
       const otp = (otpInput.value || '').replace(/\D/g, '').slice(0, 4);
       if (otp.length !== 4) {
-        alert('인증번호 4자리를 모두 입력해주세요');
+        alert(settings.strings.requireOtp4);
         otpInput.focus();
         return;
       }
 
       if (flow === 'reauth' || flow === 'changePhone') {
-        alert(flow === 'changePhone' ? '전화번호 변경이 완료되었습니다' : '재인증이 완료되었습니다');
-        location.href = '../mypage/index.html';
+        alert(flow === 'changePhone' ? settings.strings.doneChangePhone : settings.strings.doneReauth);
+        navigateTo(ROUTES.mypage());
         return;
       }
 
       const phone = normalizePhone(phoneInput.value);
-      const isNewUser = phone === '01000000000';
+      const newUserPhones = Array.isArray(settings.mock?.newUserPhones) ? settings.mock.newUserPhones : [];
+      const isNewUser = newUserPhones.includes(phone);
 
       if (flow === 'signup') {
-        location.href = '../auth/signup.html';
+        navigateTo(ROUTES.signup());
         return;
       }
 
       if (flow === 'find') {
-        location.href = '../auth/pick-name.html';
+        navigateTo(ROUTES.pickName());
         return;
       }
 
       if (isNewUser) {
-        const ok = confirm('등록된 계정이 없습니다. 회원가입 하시겠어요?');
+        const ok = confirm(settings.strings.askSignup);
         if (ok) {
-          location.href = '../calendar/index.html';
+          navigateTo(ROUTES.signup());
         } else {
-          location.href = '../home/first.html';
+          navigateTo(ROUTES.homeFirst());
         }
         return;
       }
 
-      location.href = '../calendar/index.html';
+      navigateTo(ROUTES.calendar());
     });
   }
 
   function setupPickNamePage() {
+    const settings = getSettings();
     const grid = document.getElementById('nameGrid');
     if (!grid) return;
 
-    const myName = (sessionStorage.getItem('userName') || '').trim();
-    const baseNames = ['김민지', '박서준', '이도현', '최유진', '정하늘', '홍길동'];
-    const names = myName && !baseNames.includes(myName)
-      ? [myName, ...baseNames.slice(0, 5)]
-      : baseNames;
+    const myName = (sessionStorage.getItem(STORAGE_KEYS.userName) || '').trim();
+    const baseNames = Array.isArray(settings.pickNameCandidates) ? settings.pickNameCandidates : DEFAULT_SETTINGS.pickNameCandidates;
+    const names = myName && !baseNames.includes(myName) ? [myName, ...baseNames.slice(0, 5)] : baseNames;
 
     grid.innerHTML = '';
     names.slice(0, 6).forEach((name) => {
@@ -162,53 +218,22 @@
       btn.className = 'nameCard';
       btn.textContent = name;
       btn.addEventListener('click', () => {
-        sessionStorage.setItem('pickedName', name);
-        location.href = '../calendar/index.html';
+        sessionStorage.setItem(STORAGE_KEYS.pickedName, name);
+        navigateTo(ROUTES.calendar());
       });
       grid.appendChild(btn);
     });
   }
 
-  function setupSecurityQuizPage() {
-    const doneButton = document.getElementById('btnQuizDone');
-    const quizInput = document.getElementById('quizAnswer');
-    const pickedNameSpan = document.getElementById('pickedName');
-
-    if (!doneButton || !quizInput) return;
-
-    const pickedName = (sessionStorage.getItem('pickedName') || '').trim();
-    if (pickedNameSpan) {
-      pickedNameSpan.textContent = pickedName || '선택한 이름';
-    }
-
-    const submit = () => {
-      const answer = (quizInput.value || '').trim();
-      if (!answer) {
-        alert('보안 퀴즈 답변을 입력해주세요');
-        quizInput.focus();
-        return;
-      }
-      alert('인증 완료');
-      location.href = '../calendar/index.html';
-    };
-
-    doneButton.addEventListener('click', submit);
-    quizInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submit();
-      }
-    });
-  }
-
   function setupSignupPage() {
+    const settings = getSettings();
     const nameInput = document.getElementById('signupName');
     const termsCheck = document.getElementById('termsAgree');
     const doneButton = document.getElementById('btnSignupDone');
 
     if (!nameInput || !termsCheck || !doneButton) return;
 
-    const existingName = (sessionStorage.getItem('userName') || '').trim();
+    const existingName = (sessionStorage.getItem(STORAGE_KEYS.userName) || '').trim();
     if (existingName && !nameInput.value) {
       nameInput.value = existingName;
     }
@@ -216,18 +241,18 @@
     const submit = () => {
       const name = (nameInput.value || '').trim();
       if (!name) {
-        alert('이름을 입력해주세요');
+        alert(settings.strings.requireName);
         nameInput.focus();
         return;
       }
       if (!termsCheck.checked) {
-        alert('약관 동의가 필요합니다');
+        alert(settings.strings.requireTerms);
         return;
       }
 
-      sessionStorage.setItem('userName', name);
-      alert('회원가입 완료');
-      location.href = '../calendar/index.html';
+      sessionStorage.setItem(STORAGE_KEYS.userName, name);
+      alert(settings.strings.signupDone);
+      navigateTo(ROUTES.calendar());
     };
 
     doneButton.addEventListener('click', submit);
@@ -243,7 +268,6 @@
     setupFirstPage();
     setupPhonePage();
     setupPickNamePage();
-    setupSecurityQuizPage();
     setupSignupPage();
   });
 })();

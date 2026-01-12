@@ -1192,12 +1192,12 @@ section.loca-calendar .calendar .calRow.type-head {
 .calendar + .detail {
     display: flex;
     flex-direction: row;
-    overflow-y: auto;
 }
 .calendar + .detail .detailGrid{
-    width: 100%;
+    width: calc((100% - 56px) / 2 + 56px);
     display: flex;
     flex-direction: row;
+    overflow-y: auto;
 }
 
 .calendar + .detail .detailBody{
@@ -1227,10 +1227,9 @@ section.loca-calendar .calendar .calRow.type-head {
 }
 
 .calendar + .detail .scheduleGrid{
-    flex: 0 0 50%;
-    min-width: 0;
+    width: 100%;
     position: relative;
-    height: calc(var(--row-h) * var(--rows));
+    /* height: calc(var(--row-h) * var(--rows)); */
     box-sizing: border-box;
     padding: 0 var(--outer-pad);
     --outer-pad: 4px;
@@ -1242,19 +1241,16 @@ section.loca-calendar .calendar .calRow.type-head {
 }
 
 .calendar + .detail .allDayPanel{
-    flex: 0 0 50%;
+    flex: 1;
     min-width: 0;
     border-left: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
     flex-direction: column;
 
     
-    height: 100%;
-    position: fixed;
-    right: 0;
-    width: calc(50% - 25px);
     overflow-y: auto;
-    padding-top: 37px;
+
+    padding-top: 40px;
 }
 
 .calendar + .detail .allDayHeader{
@@ -1466,6 +1462,10 @@ nav .tabs .tabItem.NOW::after {
     visibility: hidden;
     pointer-events: none;
     transition: opacity 160ms ease, visibility 0s linear 160ms;
+}
+
+.popup-overlay[hidden]{
+    display: none;
 }
 
 .popup-overlay.is-open {
@@ -1685,6 +1685,37 @@ nav .tabs .tabItem.NOW::after {
     white-space: normal;
 }
 
+.popup .taskSuggestFooter{
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.popup .taskSuggestFooter.is-hidden{
+    display: none;
+}
+
+.popup .taskSuggestAddBtn{
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: #fff;
+    color: rgba(0, 0, 0, 0.78);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.popup .taskSuggestAddBtn:disabled{
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.popup .taskSuggestAddBtn:hover{
+    background: rgba(0, 0, 0, 0.04);
+}
+
 .form-group {
     margin-top: 14px;
 }
@@ -1754,6 +1785,25 @@ nav .tabs .tabItem.NOW::after {
     box-shadow: 0 0 0 3px rgba(248, 104, 65, 0.16);
 }
 
+.form-group textarea{
+    width: 100%;
+    min-height: 90px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    background: #fff;
+    color: #111;
+    font-size: 14px;
+    outline: none;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+.form-group textarea:focus{
+    border-color: rgba(248, 104, 65, 0.65);
+    box-shadow: 0 0 0 3px rgba(248, 104, 65, 0.16);
+}
+
 .time-input {
     display: flex;
     align-items: center;
@@ -1780,6 +1830,112 @@ nav .tabs .tabItem.NOW::after {
     gap: 10px;
     padding: 14px 18px 18px;
     border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.popup-footer.is-split{
+    justify-content: space-between;
+}
+
+.popup-footer.is-split .footer-left,
+.popup-footer.is-split .footer-right{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.popup .doneToggle{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: #fff;
+    color: rgba(0, 0, 0, 0.75);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.popup .doneToggle input[type="checkbox"]{
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.popup .hierarchyBox{
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.10);
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.popup .hierarchyBox.is-hidden{
+    display: none;
+}
+
+.popup .hierarchyTitle{
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.85);
+}
+
+.popup .hierarchyPath{
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.popup .hierarchySep{
+    color: rgba(0, 0, 0, 0.35);
+    font-size: 12px;
+}
+
+.popup .hierarchyNodeBtn{
+    border: 0;
+    background: rgba(0, 0, 0, 0.02);
+    color: rgba(0, 0, 0, 0.8);
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.popup .hierarchyNodeBtn:hover{
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.popup .hierarchyNodeBtn.is-current{
+    background: rgba(248, 104, 65, 0.12);
+    color: rgba(0, 0, 0, 0.9);
+}
+
+.popup .hierarchyNodeBtn.is-highlight{
+    background: rgba(248, 104, 65, 0.18);
+    box-shadow: 0 0 0 3px rgba(248, 104, 65, 0.12);
+}
+
+.popup .is-hidden{
+    display: none !important;
+}
+
+.popup .hierarchyTree{
+    margin-top: 10px;
+    padding-left: 10px;
+    border-left: 2px solid rgba(0, 0, 0, 0.08);
+}
+
+.popup .hierarchyChild{
+    margin-top: 8px;
+}
+
+.popup .hierarchyChildren{
+    margin-top: 6px;
+    padding-left: 12px;
+    border-left: 2px dotted rgba(0, 0, 0, 0.08);
 }
 
 .popup-footer > div {

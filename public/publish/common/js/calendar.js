@@ -66,12 +66,39 @@ function saveSchedulesToStorage() {
 
 // Cache for stable per-day content
 const scheduleByDate = new Map();
-const weatherByDate = new Map();
+const _weatherByDate = new Map();
 
 let scheduleSequence = 1;
 
 function pad2(n) {
     return String(n ?? '').padStart(2, '0');
+}
+
+function clampInt(value, fallback, min, max) {
+    const n = Number.parseInt(String(value ?? ''), 10);
+    const normalized = Number.isNaN(n) ? fallback : n;
+    return Math.max(min, Math.min(max, normalized));
+}
+
+function clampNumber(value, fallback, min, max) {
+    const n = Number(value);
+    const normalized = Number.isNaN(n) ? fallback : n;
+    return Math.max(min, Math.min(max, normalized));
+}
+
+function getCalendarRangeSettings() {
+    const raw = APP_SETTINGS?.calendar?.range || {};
+    const pastMonths = clampInt(raw.pastMonths, 2, 0, 24);
+    const futureMonths = clampInt(raw.futureMonths, 3, 0, 24);
+    return { pastMonths, futureMonths, totalMonths: pastMonths + futureMonths + 1 };
+}
+
+function getOpenAIChatSettings() {
+    const raw = APP_SETTINGS?.openai || {};
+    const model = typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : 'gpt-4o-mini';
+    const temperature = clampNumber(raw.temperature, 0.7, 0, 2);
+    const maxTokens = clampInt(raw.maxTokens, 400, 50, 2000);
+    return { model, temperature, maxTokens };
 }
 
 function dateKeyToISO(dateKey) {
@@ -102,7 +129,7 @@ function normalizeTemplateName(value) {
     return String(value || '').trim();
 }
 
-const ADD_SCHEDULE_TEMPLATES = [
+const DEFAULT_ADD_SCHEDULE_TEMPLATES = [
     {
         name: '청창사 지원',
         // 임시 데이터: 2/9 18:00
@@ -129,12 +156,19 @@ const ADD_SCHEDULE_TEMPLATES = [
     },
 ];
 
-// Default related-task suggestions were removed to avoid showing dummy values.
-const ADD_SCHEDULE_DEFAULT_TASKS = [];
+function getAddScheduleTemplates() {
+    const fromSettings = APP_SETTINGS?.calendar?.addScheduleTemplates;
+    if (Array.isArray(fromSettings) && fromSettings.length) return fromSettings;
+
+    const fromGlobal = window.__P_CALENDAR_ADD_SCHEDULE_TEMPLATES__;
+    if (Array.isArray(fromGlobal) && fromGlobal.length) return fromGlobal;
+
+    return DEFAULT_ADD_SCHEDULE_TEMPLATES;
+}
 
 function getTemplateByName(value) {
     const name = normalizeTemplateName(value);
-    return ADD_SCHEDULE_TEMPLATES.find((t) => t.name === name) || null;
+    return getAddScheduleTemplates().find((t) => t.name === name) || null;
 }
 
 function templateDeadlineToISO(template) {
@@ -146,31 +180,18 @@ function templateDeadlineToISO(template) {
     return { iso, start, end };
 }
 
-function buildRelatedTasksRows(tasks) {
+function buildTasksRows(tasks, { selectable } = { selectable: false }) {
     const safeTasks = (tasks || []).slice(0, 12);
     return safeTasks
         .map((t, idx) => {
             const title = String(t?.title ?? '').trim();
             const due = String(t?.due ?? '').trim();
+            const checkCell = selectable
+                ? `<td class="col-check"><input type="checkbox" data-task-index="${idx}" /></td>`
+                : '';
             return `
                 <tr>
-                    <td class="col-check"><input type="checkbox" data-task-index="${idx}" /></td>
-                    <td>${title}</td>
-                    <td class="col-due">${due || '-'}</td>
-                </tr>
-            `;
-        })
-        .join('');
-}
-
-function buildPlainTasksRows(tasks) {
-    const safeTasks = (tasks || []).slice(0, 12);
-    return safeTasks
-        .map((t) => {
-            const title = String(t?.title ?? '').trim();
-            const due = String(t?.due ?? '').trim();
-            return `
-                <tr>
+                    ${checkCell}
                     <td>${title}</td>
                     <td class="col-due">${due || '-'}</td>
                 </tr>
@@ -303,26 +324,6 @@ function parseDateKey(key) {
     const d = new Date(parts[0], parts[1] - 1, parts[2]);
     d.setHours(0, 0, 0, 0);
     return d;
-}
-
-function isHoliday(date) {
-    const day = date.getDay();
-    if (WEEK_START === 'MON') return day === 0 || day === 6;
-    return day === 0 || day === 6;
-}
-
-function getDayCellClass(date) {
-    let className = 'calSell' + (isHoliday(date) ? ' type-holi' : '');
-
-    if (date.toDateString() === CURRENT_DATE.toDateString()) {
-        className += ' type-today';
-    } else if (date < CURRENT_DATE) {
-        className += ' type-back';
-    } else {
-        className += ' type-yet';
-    }
-
-    return className;
 }
 
 const DETAIL_START_HOUR = 0;
@@ -563,47 +564,6 @@ function buildAllDayListHTML(schedules, dateKey) {
     `;
 }
 
-function buildUndatedListHTML() {
-    const schedules = scheduleByDate.get(UNDATED_DATE_KEY) || [];
-    const items = (schedules || [])
-        .map((s) => ({
-            id: s?.id,
-            title: String(s?.type ?? '').trim(),
-            isDone: !!s?.isDone,
-        }))
-        .filter((s) => s.id && s.title);
-
-    const listHTML = items.length
-        ? items
-              .map((s) => {
-                  const doneClass = s.isDone ? ' type-done' : '';
-                  return `
-                    <button type="button" class="planItem allDayItem${doneClass}" data-date="${UNDATED_DATE_KEY}" data-id="${s.id}">
-                        <div class="info">
-                            <h6>${s.title}</h6>
-                        </div>
-                    </button>
-                  `;
-              })
-              .join('')
-        : '';
-
-    return `
-        <div class="allDayPanel" id="undatedPanel">
-            <div class="allDayHeader">
-                <h6>날짜 미정</h6>
-            </div>
-            <div class="allDayList">${listHTML}</div>
-        </div>
-    `;
-}
-
-function renderUndatedPanel() {
-    const host = document.getElementById('undatedPanelHost');
-    if (!host) return;
-    host.innerHTML = buildUndatedListHTML();
-}
-
 function renderDetailForDate(dateKey) {
     const detail = document.querySelector('.calendar + .detail') || document.querySelector('.detail');
     if (!detail) return;
@@ -616,7 +576,6 @@ function renderDetailForDate(dateKey) {
     const timetableHTML = buildTimetableHTML(dateKey);
     const gridHTML = buildScheduleGridHTML(schedules, dateKey);
     const allDayHTML = buildAllDayListHTML(schedules, dateKey);
-    const undatedHTML = buildUndatedListHTML();
 
     const emptyHTML = schedules.length
         ? ''
@@ -628,10 +587,9 @@ function renderDetailForDate(dateKey) {
             ${timetableHTML}
             <div class="detailBody">
                 ${gridHTML}
-                ${allDayHTML}
-                <div id="undatedPanelHost">${undatedHTML}</div>
             </div>
         </div>
+        ${allDayHTML}
         ${emptyHTML}
     `;
 }
@@ -667,85 +625,83 @@ function setupDetailInteractions() {
 
 // Generate calendar
 function generateCalendar() {
-const container = document.getElementById('calendarContainer');
-const startDate = new Date(CURRENT_DATE);
-startDate.setMonth(CURRENT_DATE.getMonth() - 2);
-const startMonth = startDate.getMonth();
-const startYear = startDate.getFullYear();
-const monthsToGenerate = 6; // Oct, Nov, Dec 2025 + Jan, Feb, Mar 2026
+    const container = document.getElementById('calendarContainer');
+    if (!container) return;
 
-// Header row
-const headerRow = createHeaderRow();
-container.appendChild(headerRow);
+    // Prevent double-render if called twice.
+    container.innerHTML = '';
 
-// Generate calendar rows
-let currentRow = null;
-let cellCount = 0;
+    const { pastMonths, totalMonths } = getCalendarRangeSettings();
+    const startDate = new Date(CURRENT_DATE);
+    startDate.setMonth(CURRENT_DATE.getMonth() - pastMonths);
 
-for (let m = 0; m < monthsToGenerate; m++) {
-const month = (startMonth + m) % 12;
-const year = startYear + Math.floor((startMonth + m) / 12);
+    const startMonth = startDate.getMonth();
+    const startYear = startDate.getFullYear();
 
-// Add month title
-const monthTitle = document.createElement('div');
-monthTitle.className = 'calRow type-month-title';
-monthTitle.innerHTML = `<h4>${year}년 ${month + 1}월</h4>`;
-monthTitle.setAttribute('data-month', `${year}-${month + 1}`);
-// container.appendChild(monthTitle);
+    // Header row
+    container.appendChild(createHeaderRow());
 
-const result = generateMonthRows(container, year, month, currentRow, cellCount);
-currentRow = result.currentRow;
-cellCount = result.cellCount;
-}
+    // Generate calendar rows
+    let currentRow = null;
+    let cellCount = 0;
 
-// Append remaining row if exists and fill to 7 cells
-if (currentRow && cellCount > 0) {
-while (cellCount < 7) {
-const emptyCell = document.createElement('div');
-emptyCell.className = 'calSell';
-currentRow.appendChild(emptyCell);
-cellCount++;
-}
-container.appendChild(currentRow);
-}
+    for (let m = 0; m < totalMonths; m++) {
+        const month = (startMonth + m) % 12;
+        const year = startYear + Math.floor((startMonth + m) / 12);
 
-// Scroll to current week
-scrollToCurrentWeek();
-// Setup sticky header
-setupStickyHeader();
+        const result = generateMonthRows(container, year, month, currentRow, cellCount);
+        currentRow = result.currentRow;
+        cellCount = result.cellCount;
+    }
 
-// Detail default: today
-const todayKey = getDateKey(CURRENT_DATE);
-selectCalendarCell(todayKey);
-renderDetailForDate(todayKey);
-setupDetailInteractions();
+    // Append remaining row if exists and fill to 7 cells
+    if (currentRow && cellCount > 0) {
+        while (cellCount < 7) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'calSell';
+            currentRow.appendChild(emptyCell);
+            cellCount++;
+        }
+        container.appendChild(currentRow);
+    }
+
+    // Scroll to current week
+    scrollToCurrentWeek();
+
+    // Setup sticky header
+    setupStickyHeader();
+
+    // Detail default: today
+    const todayKey = getDateKey(CURRENT_DATE);
+    selectCalendarCell(todayKey);
+    renderDetailForDate(todayKey);
+    setupDetailInteractions();
 }
 
 function createHeaderRow() {
-const row = document.createElement('div');
-row.className = 'calRow type-head';
+    const row = document.createElement('div');
+    row.className = 'calRow type-head';
 
-const days = WEEK_START === 'MON' 
-? ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const days =
+        WEEK_START === 'MON'
+            ? ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+            : ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-const korDays = WEEK_START === 'MON'
-? ['월', '화', '수', '목', '금', '토', '일']
-: ['일', '월', '화', '수', '목', '금', '토'];
+    const korDays = WEEK_START === 'MON' ? ['월', '화', '수', '목', '금', '토', '일'] : ['일', '월', '화', '수', '목', '금', '토'];
 
-days.forEach((day, idx) => {
-const cell = document.createElement('div');
-cell.className = 'calSell' + (idx >= 5 ? ' type-holi' : '');
-cell.innerHTML = `
-<div class="topic">
-<h5>${day}</h5>
-<h6>${korDays[idx]}</h6>
-</div>
-`;
-row.appendChild(cell);
-});
+    days.forEach((day, idx) => {
+        const cell = document.createElement('div');
+        cell.className = 'calSell' + (idx >= 5 ? ' type-holi' : '');
+        cell.innerHTML = `
+            <div class="topic">
+                <h5>${day}</h5>
+                <h6>${korDays[idx]}</h6>
+            </div>
+        `;
+        row.appendChild(cell);
+    });
 
-return row;
+    return row;
 }
 
 // NOTE: This app used to generate random demo schedules/weather.
@@ -788,172 +744,198 @@ function createPlanHTML(dateKeyOrSchedules, maybeSchedules) {
 function generateMonthRows(container, year, month, currentRow, cellCount) {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startOffset = WEEK_START === 'MON' 
-    ? firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1
-    : firstDay.getDay();
-    
-    let dayCounter = 1;
-    
+    const startOffset =
+        WEEK_START === 'MON' ? (firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1) : firstDay.getDay();
+
     // Create new row only if no existing row
     if (!currentRow || cellCount === 0) {
-    currentRow = document.createElement('div');
-    currentRow.className = 'calRow type-body';
-    currentRow.setAttribute('data-month', `${year}-${month + 1}`);
-    cellCount = 0;
+        currentRow = document.createElement('div');
+        currentRow.className = 'calRow type-body';
+        currentRow.setAttribute('data-month', `${year}-${month + 1}`);
+        cellCount = 0;
     }
-    
+
     // Add padding for first week only if starting new row
     if (cellCount === 0) {
-    for (let i = 0; i < startOffset; i++) {
-    const emptyCell = document.createElement('div');
-    emptyCell.className = 'calSell';
-    currentRow.appendChild(emptyCell);
-    cellCount++;
+        for (let i = 0; i < startOffset; i++) {
+            const emptyCell = document.createElement('div');
+            emptyCell.className = 'calSell';
+            currentRow.appendChild(emptyCell);
+            cellCount++;
+        }
     }
-    }
-    
+
     // Add days of month
     for (let day = 1; day <= lastDay.getDate(); day++) {
-    if (cellCount === 7) {
-    container.appendChild(currentRow);
-    currentRow = document.createElement('div');
-    currentRow.className = 'calRow type-body';
-    currentRow.setAttribute('data-month', `${year}-${month + 1}`);
-    cellCount = 0;
-    }
-    
-    const cell = document.createElement('div');
-    const dayOfWeek = (startOffset + day - 1) % 7;
-    const isHoliday = WEEK_START === 'MON' ? dayOfWeek >= 5 : dayOfWeek === 0 || dayOfWeek === 6;
-    
-    const cellDate = new Date(year, month, day);
-    let className = 'calSell' + (isHoliday ? ' type-holi' : '');
-    
-    if (cellDate.toDateString() === CURRENT_DATE.toDateString()) {
-    className += ' type-today';
-    } else if (cellDate < CURRENT_DATE) {
-    className += ' type-back';
-    } else if (cellDate > CURRENT_DATE) {
-    className += ' type-yet';
-    }
-    
-    cell.className = className;
-    const dateKey = `${year}-${month + 1}-${day}`;
-    cell.setAttribute('data-date', dateKey);
-    
-    let schedules = scheduleByDate.get(dateKey);
-    if (!Array.isArray(schedules)) {
-        schedules = ensureScheduleMeta(dateKey, []);
-        scheduleByDate.set(dateKey, schedules);
-    } else {
+        if (cellCount === 7) {
+            container.appendChild(currentRow);
+            currentRow = document.createElement('div');
+            currentRow.className = 'calRow type-body';
+            currentRow.setAttribute('data-month', `${year}-${month + 1}`);
+            cellCount = 0;
+        }
+
+        const cell = document.createElement('div');
+        const cellDate = new Date(year, month, day);
+        const dateKey = getDateKey(cellDate);
+
+        const isWeekend = cellDate.getDay() === 0 || cellDate.getDay() === 6;
+        let className = 'calSell' + (isWeekend ? ' type-holi' : '');
+
+        if (cellDate.toDateString() === CURRENT_DATE.toDateString()) {
+            className += ' type-today';
+        } else if (cellDate < CURRENT_DATE) {
+            className += ' type-back';
+        } else {
+            className += ' type-yet';
+        }
+
+        cell.className = className;
+        cell.setAttribute('data-date', dateKey);
+
+        let schedules = scheduleByDate.get(dateKey);
+        if (!Array.isArray(schedules)) schedules = [];
         schedules = ensureScheduleMeta(dateKey, schedules);
         scheduleByDate.set(dateKey, schedules);
+
+        const planHTML = createPlanHTML(dateKey, schedules);
+        // Weather is not loaded yet; avoid dummy values.
+        const weatherHTML = '';
+
+        cell.innerHTML = `
+            <div class="topic">
+                <h5>${day}</h5>
+                ${weatherHTML}
+            </div>
+            ${planHTML}
+        `;
+
+        currentRow.appendChild(cell);
+        cellCount++;
     }
-    const planHTML = createPlanHTML(dateKey, schedules);
-    // Weather is not loaded yet; avoid dummy values.
-    const weatherHTML = '';
-    
-    cell.innerHTML = `
-    <div class="topic">
-    <h5>${day}</h5>
-    ${weatherHTML}
-    </div>
-    ${planHTML}
-    `;
-    
-    currentRow.appendChild(cell);
-    cellCount++;
-    }
-    
+
     return { currentRow, cellCount };
 }
 
 function scrollToCurrentWeek() {
-const dateStr = `${CURRENT_DATE.getFullYear()}-${CURRENT_DATE.getMonth() + 1}-${CURRENT_DATE.getDate()}`;
-const targetCell = document.querySelector(`[data-date="${dateStr}"]`);
+    const dateKey = getDateKey(CURRENT_DATE);
+    const targetCell = document.querySelector(`[data-date="${dateKey}"]`);
+    if (!targetCell) return;
 
-if (targetCell) {
-const container = document.querySelector('.content');
-const row = targetCell.closest('.calRow');
-const offset = row.offsetTop - container.offsetTop - 118;
-container.scrollTop = offset;
-}
+    const container = document.querySelector('.content');
+    if (!container) return;
+
+    const row = targetCell.closest('.calRow');
+    if (!row) return;
+
+    const padding = clampInt(APP_SETTINGS?.calendar?.scrollPaddingTop, 118, 0, 500);
+    const offset = row.offsetTop - container.offsetTop - padding;
+    container.scrollTop = Math.max(0, offset);
 }
 
 function setupStickyHeader() {
-const contentDiv = document.querySelector('.content');
-const headerRow = document.querySelector('.calRow.type-head');
-const today = new Date();
-const todayCell = document.querySelector(`[data-date="${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}"]`);
-if (todayCell) {
-    const dayOfWeek = todayCell.closest('.calRow').querySelector('.calSell').parentElement.children[Array.from(todayCell.parentElement.children).indexOf(todayCell)];
-    const headerCells = document.querySelectorAll('.calRow.type-head .calSell');
+    const contentDiv = document.querySelector('.content');
+    const headerRow = document.querySelector('.calRow.type-head');
+    if (!contentDiv || !headerRow) return;
+
+    // Prevent duplicate sticky headers if re-initialized.
+    const existing = contentDiv.querySelector(':scope > .sticky-header.calendar');
+    if (existing) existing.remove();
+
+    const today = new Date();
     const todayDayOfWeek = today.getDay();
-    const adjustedIndex = WEEK_START === 'MON' ? (todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1) : todayDayOfWeek;
-    headerCells[adjustedIndex].classList.add('type-today');
-}
-const stickyContainer = document.createElement('div');
-stickyContainer.className = 'sticky-header calendar';
-stickyContainer.style.cssText = 'position: sticky; top: 0; background: white; z-index: 10; display: none;';
+    const todayIndex = WEEK_START === 'MON' ? (todayDayOfWeek === 0 ? 6 : todayDayOfWeek - 1) : todayDayOfWeek;
 
-const stickyMonth = document.createElement('div');
-stickyMonth.className = 'calRow type-month-title';
-stickyMonth.innerHTML = '<h4>2025년 10월</h4>';
+    const headerCells = headerRow.querySelectorAll('.calSell');
+    headerCells[todayIndex]?.classList?.add('type-today');
 
-const stickyHeader = headerRow.cloneNode(true);
-stickyHeader.className = 'calRow type-head';
+    const stickyContainer = document.createElement('div');
+    stickyContainer.className = 'sticky-header calendar';
+    stickyContainer.style.cssText = 'position: sticky; top: 0; background: white; z-index: 10; display: none;';
 
-stickyContainer.appendChild(stickyMonth);
-stickyContainer.appendChild(stickyHeader);
-contentDiv.insertBefore(stickyContainer, contentDiv.firstChild);
+    const stickyMonth = document.createElement('div');
+    stickyMonth.className = 'calRow type-month-title';
 
-contentDiv.addEventListener('scroll', () => {
-const offset = 100;
-const rows = Array.from(document.querySelectorAll('.calRow.type-body'));
+    const stickyHeader = headerRow.cloneNode(true);
+    stickyHeader.className = 'calRow type-head';
+    stickyHeader.querySelectorAll('.calSell')[todayIndex]?.classList?.add('type-today');
 
-let currentMonth = '2025-10';
-for (let row of rows) {
-const rowTop = row.offsetTop - contentDiv.offsetTop;
-if (rowTop >= contentDiv.scrollTop + offset) {
-break;
-}
-currentMonth = row.getAttribute('data-month');
-}
+    stickyContainer.appendChild(stickyMonth);
+    stickyContainer.appendChild(stickyHeader);
+    contentDiv.insertBefore(stickyContainer, contentDiv.firstChild);
 
-stickyMonth.innerHTML = `<h4>${currentMonth.split('-')[0]}년 ${currentMonth.split('-')[1]}월</h4>`;
-stickyContainer.style.display = 'block';
-});
+    const offset = clampInt(APP_SETTINGS?.calendar?.stickyOffset, 100, 0, 300);
+    const defaultMonth = `${CURRENT_DATE.getFullYear()}-${CURRENT_DATE.getMonth() + 1}`;
+
+    const onScroll = () => {
+        const rows = Array.from(document.querySelectorAll('.calRow.type-body'));
+
+        let currentMonth = defaultMonth;
+        for (const row of rows) {
+            const rowTop = row.offsetTop - contentDiv.offsetTop;
+            if (rowTop >= contentDiv.scrollTop + offset) break;
+            currentMonth = row.getAttribute('data-month') || currentMonth;
+        }
+
+        const parts = String(currentMonth || defaultMonth).split('-');
+        const y = parts[0] || String(CURRENT_DATE.getFullYear());
+        const m = parts[1] || String(CURRENT_DATE.getMonth() + 1);
+        stickyMonth.innerHTML = `<h4>${y}년 ${m}월</h4>`;
+        stickyContainer.style.display = contentDiv.scrollTop > 0 ? 'block' : 'none';
+    };
+
+    contentDiv.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
 }
 
 function setupPopupToggles() {
     const openPopup = (popupId) => {
         const overlay = document.getElementById(popupId);
         if (!overlay) return;
+        overlay.hidden = false;
+        overlay.setAttribute('aria-hidden', 'false');
         overlay.classList.remove('is-suspended');
-        overlay.classList.add('is-open');
+        // Ensure transition kicks in.
+        requestAnimationFrame(() => {
+            overlay.classList.add('is-open');
+        });
     };
 
     const closePopup = (overlay) => {
         if (!overlay) return;
         overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        // After fade-out, fully remove from hit-testing/layout.
+        setTimeout(() => {
+            if (overlay.classList.contains('is-open')) return;
+            if (overlay.classList.contains('is-suspended')) return;
+            overlay.hidden = true;
+        }, 180);
 
         // If we opened detail from overlap list, restore it when detail closes
         if (overlay === detailOverlay && overlapOverlay && overlapOverlay.classList.contains('is-open')) {
             overlapOverlay.classList.remove('is-suspended');
+            overlapOverlay.setAttribute('aria-hidden', 'false');
+            overlapOverlay.hidden = false;
         }
     };
 
     const planAddBtn = document.getElementById('planADD');
-    if (planAddBtn) {
-        planAddBtn.addEventListener('click', () => openPopup('addSchedulePopup'));
-    }
 
     const addOverlay = document.getElementById('addSchedulePopup');
     const detailOverlay = document.getElementById('detailSchedulePopup');
     const deleteOverlay = document.getElementById('deleteConfirmPopup');
     const overlapOverlay = document.getElementById('overlapListPopup');
 
+    // Default all overlays to fully hidden so they can't block background clicks.
+    [addOverlay, detailOverlay, deleteOverlay, overlapOverlay].filter(Boolean).forEach((ov) => {
+        const isOpen = ov.classList.contains('is-open');
+        ov.hidden = !isOpen;
+        ov.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+    });
+
     const addName = document.getElementById('scheduleName');
+    const addMemo = document.getElementById('scheduleMemo');
     const addDate = document.getElementById('scheduleDate');
     const addStart = document.getElementById('scheduleStart');
     const addEnd = document.getElementById('scheduleEnd');
@@ -964,14 +946,22 @@ function setupPopupToggles() {
     const relatedTasksTable = document.getElementById('relatedTasksTable');
     const taskSuggestBtn = document.getElementById('taskSuggestBtn');
     const taskSuggestBox = addOverlay ? addOverlay.querySelector('.taskSuggest') : null;
+    const addTimeGroup = document.getElementById('addTimeGroup');
+    const addTimeFormGroup = document.getElementById('addTimeFormGroup');
 
     const detailTaskSuggestBox = detailOverlay ? detailOverlay.querySelector('#detailTaskSuggest') : null;
     const detailTaskSuggestBtn = document.getElementById('detailTaskSuggestBtn');
     const detailRelatedTasksTable = document.getElementById('detailRelatedTasksTable');
+    const detailAddRelatedTasksBtn = document.getElementById('detailAddRelatedTasksBtn');
     const detailName = document.getElementById('detailName');
+    const detailMemo = document.getElementById('detailMemo');
     const detailDate = document.getElementById('detailDate');
+    const detailAllDay = document.getElementById('detailAllDay');
     const detailStart = document.getElementById('detailStart');
     const detailEnd = document.getElementById('detailEnd');
+    const detailHierarchyBox = document.getElementById('detailHierarchy');
+    const detailTimeGroup = document.getElementById('detailTimeGroup');
+    const detailTimeFormGroup = document.getElementById('detailTimeFormGroup');
 
     const applyAddDateTimeToggleState = () => {
         const isUndated = !!addDateUnset?.checked;
@@ -990,13 +980,32 @@ function setupPopupToggles() {
         const disableTime = isUndated || isAllDay;
         if (addStart) {
             addStart.disabled = disableTime;
-            if (disableTime) addStart.value = '';
         }
         if (addEnd) {
             addEnd.disabled = disableTime;
-            if (disableTime) addEnd.value = '';
         }
+
+        if (addTimeFormGroup) addTimeFormGroup.classList.toggle('is-hidden', disableTime);
+        else if (addTimeGroup) addTimeGroup.classList.toggle('is-hidden', disableTime);
     };
+
+    const applyDetailDateTimeToggleState = () => {
+        const isAllDay = !!detailAllDay?.checked;
+        if (detailStart) {
+            detailStart.disabled = isAllDay;
+        }
+        if (detailEnd) {
+            detailEnd.disabled = isAllDay;
+        }
+        if (detailTimeFormGroup) detailTimeFormGroup.classList.toggle('is-hidden', isAllDay);
+        else if (detailTimeGroup) detailTimeGroup.classList.toggle('is-hidden', isAllDay);
+    };
+
+    if (detailAllDay) {
+        detailAllDay.addEventListener('change', () => {
+            applyDetailDateTimeToggleState();
+        });
+    }
 
     const collapseTaskSuggest = () => {
         if (!taskSuggestBox) return;
@@ -1021,7 +1030,7 @@ function setupPopupToggles() {
     const rebuildAddNameOptions = () => {
         if (!addNameOptions) return;
         const names = new Set();
-        ADD_SCHEDULE_TEMPLATES.forEach((t) => names.add(t.name));
+        getAddScheduleTemplates().forEach((t) => names.add(t.name));
         for (const list of scheduleByDate.values()) {
             (list || []).forEach((s) => {
                 const n = String(s?.type ?? '').trim();
@@ -1036,7 +1045,7 @@ function setupPopupToggles() {
         if (!relatedTasksTable) return;
         const tbody = relatedTasksTable.querySelector('tbody');
         if (!tbody) return;
-        tbody.innerHTML = buildRelatedTasksRows(tasks);
+        tbody.innerHTML = buildTasksRows(tasks, { selectable: true });
         if (addOverlay) addOverlay.dataset.relatedTasks = JSON.stringify(tasks || []);
     };
 
@@ -1044,9 +1053,171 @@ function setupPopupToggles() {
         if (!detailRelatedTasksTable) return;
         const tbody = detailRelatedTasksTable.querySelector('tbody');
         if (!tbody) return;
-        tbody.innerHTML = buildPlainTasksRows(tasks);
+        tbody.innerHTML = buildTasksRows(tasks, { selectable: true });
         if (detailOverlay) detailOverlay.dataset.relatedTasks = JSON.stringify(tasks || []);
+
+        const footer = detailOverlay ? detailOverlay.querySelector('#detailTaskSuggest .taskSuggestFooter') : null;
+        const hasTasks = Array.isArray(tasks) && tasks.length > 0;
+        if (footer) footer.classList.toggle('is-hidden', !hasTasks);
+        if (detailAddRelatedTasksBtn) detailAddRelatedTasksBtn.disabled = true;
     };
+
+    const updateDetailAddRelatedTasksBtnState = () => {
+        if (!detailAddRelatedTasksBtn) return;
+        if (!detailRelatedTasksTable) return;
+        const footer = detailOverlay ? detailOverlay.querySelector('#detailTaskSuggest .taskSuggestFooter') : null;
+        const isFooterHidden = !!footer?.classList?.contains('is-hidden');
+        if (isFooterHidden) {
+            detailAddRelatedTasksBtn.disabled = true;
+            return;
+        }
+        const anyChecked = !!detailRelatedTasksTable.querySelector('tbody input[type="checkbox"]:checked');
+        detailAddRelatedTasksBtn.disabled = !anyChecked;
+    };
+
+    const renderDetailHierarchyFor = (currentDateKey, currentScheduleId, { highlightIds } = {}) => {
+        if (!detailHierarchyBox) return;
+        const treeEl = detailHierarchyBox.querySelector('[data-role="tree"]');
+        if (!treeEl) return;
+
+        const escapeHtml = (value) =>
+            String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+
+        const locateScheduleById = (anyScheduleId) => {
+            const needle = String(anyScheduleId || '');
+            if (!needle) return null;
+            for (const [dk, list] of scheduleByDate.entries()) {
+                const idx = (list || []).findIndex((s) => String(s?.id || '') === needle);
+                if (idx >= 0) return { dateKey: dk, schedule: list[idx], index: idx, id: needle };
+            }
+            return null;
+        };
+
+        const findChildrenLocators = (parentId) => {
+            const needle = String(parentId || '');
+            if (!needle) return [];
+            const out = [];
+            for (const [dk, list] of scheduleByDate.entries()) {
+                (list || []).forEach((s, idx) => {
+                    if (String(s?.parentScheduleId || '') !== needle) return;
+                    out.push({ dateKey: dk, schedule: s, index: idx, id: String(s?.id || '') });
+                });
+            }
+
+            out.sort((a, b) => {
+                if (a.dateKey !== b.dateKey) return String(a.dateKey).localeCompare(String(b.dateKey));
+                const aStart = toHour(a?.schedule?.time?.start);
+                const bStart = toHour(b?.schedule?.time?.start);
+                if (aStart == null && bStart != null) return 1;
+                if (aStart != null && bStart == null) return -1;
+                if (aStart != null && bStart != null && aStart !== bStart) return aStart - bStart;
+                return String(a?.schedule?.type || '').localeCompare(String(b?.schedule?.type || ''));
+            });
+
+            return out.filter((x) => x.id);
+        };
+
+        const formatNodeLabel = (loc) => {
+            const title = String(loc?.schedule?.type ?? '').trim();
+            const dk = String(loc?.dateKey || '').trim();
+            const start = toHour(loc?.schedule?.time?.start);
+            const end = toHour(loc?.schedule?.time?.end);
+            const timeText = start != null && end != null ? ` ${pad2(start)}~${pad2(Math.min(24, end))}` : '';
+            return `${escapeHtml(title || '(제목 없음)')}<span class="hierarchySep"> · </span>${escapeHtml(dk)}${escapeHtml(timeText)}`;
+        };
+
+        const current = locateScheduleById(currentScheduleId) || {
+            dateKey: currentDateKey,
+            schedule: findScheduleById(currentDateKey, currentScheduleId),
+            id: String(currentScheduleId),
+        };
+        if (!current?.schedule) {
+            detailHierarchyBox.classList.add('is-hidden');
+            treeEl.innerHTML = '';
+            return;
+        }
+
+        const hasParent = !!current?.schedule?.parentScheduleId;
+        const hasChildren = findChildrenLocators(current?.id).length > 0;
+        if (!hasParent && !hasChildren) {
+            detailHierarchyBox.classList.add('is-hidden');
+            treeEl.innerHTML = '';
+            return;
+        }
+        detailHierarchyBox.classList.remove('is-hidden');
+
+        const chain = [];
+        const seen = new Set();
+        let walker = current;
+        let guard = 0;
+        while (walker && walker.id && guard++ < 30) {
+            if (seen.has(walker.id)) break;
+            seen.add(walker.id);
+            chain.push(walker);
+            const pid = String(walker?.schedule?.parentScheduleId || '');
+            if (!pid) break;
+            walker = locateScheduleById(pid);
+            if (!walker) break;
+        }
+        chain.reverse();
+        const chainIds = new Set(chain.map((x) => String(x?.id || '')).filter(Boolean));
+
+        const root = chain.length ? chain[0] : current;
+        const buildTreeFromLocator = (loc, depth, visited) => {
+            if (!loc?.id) return '';
+            if (depth > 8) return '';
+            if (visited.has(loc.id)) return '';
+            visited.add(loc.id);
+
+            const isCurrent = String(loc.id) === String(current.id);
+            const shouldExpand = chainIds.has(String(loc.id));
+            const kids = shouldExpand ? findChildrenLocators(loc.id) : [];
+            const kidsHtml = (kids || [])
+                .map((kid) => buildTreeFromLocator(kid, depth + 1, visited))
+                .filter(Boolean)
+                .join('');
+
+            return `
+                <div class="hierarchyChild">
+                    <button type="button" class="hierarchyNodeBtn${isCurrent ? ' is-current' : ''}" data-id="${escapeHtml(loc.id)}">${formatNodeLabel(loc)}</button>
+                    ${kidsHtml ? `<div class="hierarchyChildren">${kidsHtml}</div>` : ''}
+                </div>
+            `;
+        };
+
+        treeEl.innerHTML = buildTreeFromLocator(root, 0, new Set()) || '';
+
+        const ids = Array.isArray(highlightIds) ? highlightIds.map((x) => String(x)).filter(Boolean) : [];
+        if (ids.length) {
+            ids.forEach((id) => {
+                const btns = Array.from(detailHierarchyBox.querySelectorAll('button[data-id]')).filter(
+                    (b) => String(b.getAttribute('data-id') || '') === id
+                );
+                btns.forEach((b) => b.classList.add('is-highlight'));
+            });
+            setTimeout(() => {
+                ids.forEach((id) => {
+                    const btns = Array.from(detailHierarchyBox.querySelectorAll('button[data-id]')).filter(
+                        (b) => String(b.getAttribute('data-id') || '') === id
+                    );
+                    btns.forEach((b) => b.classList.remove('is-highlight'));
+                });
+            }, 500);
+        }
+    };
+
+    if (detailRelatedTasksTable) {
+        detailRelatedTasksTable.addEventListener('change', (e) => {
+            const chk = e.target?.closest?.('input[type="checkbox"]');
+            if (!chk) return;
+            updateDetailAddRelatedTasksBtnState();
+        });
+    }
 
     const getRecentScheduleNames = () => {
         try {
@@ -1213,41 +1384,41 @@ function setupPopupToggles() {
         if (activeSuggestAbort) activeSuggestAbort.abort();
         activeSuggestAbort = new AbortController();
 
-        const recentNames = getRecentScheduleNames().filter((n) => n !== cleanName).slice(0, 8);
+        // (reserved) recent schedule names could be used for context in the future.
         const baseKey = baseDateKey && baseDateKey !== UNDATED_DATE_KEY ? baseDateKey : null;
         const baseIso = baseKey ? dateKeyToISO(baseKey) : '';
 
-const system =
-  'You are a deterministic todo-suggestion engine for a personal calendar. ' +
-  'You may suggest due dates ONLY for a small subset of todos when it is clearly necessary. ' +
-  'You must NOT schedule all todos or distribute dates evenly. ' +
-  'Return ONLY valid JSON with no extra text.';
+                const system =
+                        'You are a deterministic todo-suggestion engine for a personal calendar. ' +
+                        'You may suggest due dates ONLY for a small subset of todos when it is clearly necessary. ' +
+                        'You must NOT schedule all todos or distribute dates evenly. ' +
+                        'Return ONLY valid JSON with no extra text.';
 
+                const user =
+                        `일정명: "${cleanName}"\n` +
+                        (baseIso ? `일정 날짜(D-day): ${baseIso}\n` : '일정 날짜(D-day): (날짜 미정)\n') +
+                        '먼저 일정명의 핵심 문제 성격을 한 단어로 내부적으로 해석한다.\n' +
+                        '문제 성격 예시는 건강, 생활습관, 감정, 교육, 업무, 서비스 기획 등이다.\n' +
+                        '연관 할일은 해당 문제 성격을 반영한 관점의 대표 행동이어야 한다.\n' +
+                        '위 정보를 참고해서 연관 할일 7개를 제안해줘.\n' +
+                        '각 할일은 이 일정이 없으면 하지 않을 행동이어야 한다.\n' +
+                        '의미가 겹치는 할일은 하나로 묶어 제안한다.\n' +
+                        '각 할일은 지금 바로 체크할 수 있는 1단계 행동이어야 한다.\n' +
+                        '검색, 확인, 선택, 신청, 접속, 작성 같은 즉시 행동만 허용한다.\n' +
+                        '\n' +
+                        '날짜(due) 규칙:\n' +
+                        '- 날짜는 반드시 필요한 할일에만 최대 3개까지 제안한다.\n' +
+                        '- 날짜가 없는 할일은 due를 ""로 둔다.\n' +
+                        '- 날짜가 있는 경우에만 "D-숫자 HH:MM" 형식을 사용한다.\n' +
+                        '- 모든 할일에 날짜를 부여하는 것은 금지한다.\n' +
+                        '\n출력 형식(반드시 JSON만):\n' +
+                        '[{"title":"할일","due":""}]\n' +
+                        '- title은 12자 내외, 동사+목적어 형태\n' +
+                        '- 추상적인 표현 금지\n' +
+                        '- 일정과 직접 관련 없는 행동 금지\n' +
+                        '- 정확히 7개';
 
-
-const user =
-  `일정명: "${cleanName}"\n` +
-  (baseIso ? `일정 날짜(D-day): ${baseIso}\n` : '일정 날짜(D-day): (날짜 미정)\n') +
-  '먼저 일정명의 핵심 문제 성격을 한 단어로 내부적으로 해석한다.\n' +
-  '문제 성격 예시는 건강, 생활습관, 감정, 교육, 업무, 서비스 기획 등이다.\n' +
-  '연관 할일은 해당 문제 성격을 반영한 관점의 대표 행동이어야 한다.\n' +
-  '위 정보를 참고해서 연관 할일 7개를 제안해줘.\n' +
-  '각 할일은 이 일정이 없으면 하지 않을 행동이어야 한다.\n' +
-  '의미가 겹치는 할일은 하나로 묶어 제안한다.\n' +
-  '각 할일은 지금 바로 체크할 수 있는 1단계 행동이어야 한다.\n' +
-  '검색, 확인, 선택, 신청, 접속, 작성 같은 즉시 행동만 허용한다.\n' +
-  '\n' +
-  '날짜(due) 규칙:\n' +
-  '- 날짜는 반드시 필요한 할일에만 최대 3개까지 제안한다.\n' +
-  '- 날짜가 없는 할일은 due를 ""로 둔다.\n' +
-  '- 날짜가 있는 경우에만 "D-숫자 HH:MM" 형식을 사용한다.\n' +
-  '- 모든 할일에 날짜를 부여하는 것은 금지한다.\n' +
-  '\n출력 형식(반드시 JSON만):\n' +
-  '[{"title":"할일","due":""}]\n' +
-  '- title은 12자 내외, 동사+목적어 형태\n' +
-  '- 추상적인 표현 금지\n' +
-  '- 일정과 직접 관련 없는 행동 금지\n' +
-  '- 정확히 7개';
+                    const { model, temperature, maxTokens } = getOpenAIChatSettings();
 
 
 
@@ -1260,9 +1431,9 @@ const user =
                     Authorization: `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4o-mini',
-                    temperature: 0.7,
-                    max_tokens: 400,
+                    model,
+                    temperature,
+                    max_tokens: maxTokens,
                     messages: [
                         { role: 'system', content: system },
                         { role: 'user', content: user },
@@ -1400,6 +1571,7 @@ const user =
     };
     const detailDone = document.getElementById('detailDone');
 
+    if (planAddBtn) {
         planAddBtn.addEventListener('click', () => {
             const selectedDateKey = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
             if (addDate && selectedDateKey) addDate.value = dateKeyToISO(selectedDateKey);
@@ -1412,8 +1584,10 @@ const user =
             lastSuggestedSignature = '';
             suggestingSignature = '';
             collapseTaskSuggest();
+            if (addMemo) addMemo.value = '';
             openPopup('addSchedulePopup');
         });
+    }
 
 
     if (addName) {
@@ -1494,6 +1668,92 @@ const user =
             suggestDetailRelatedTasks();
         });
     }
+
+    if (detailAddRelatedTasksBtn) {
+        detailAddRelatedTasksBtn.addEventListener('click', () => {
+            if (!detailOverlay) return;
+            const dateKey = detailOverlay.dataset.dateKey;
+            const scheduleId = detailOverlay.dataset.scheduleId;
+            if (!dateKey || !scheduleId) return;
+
+            const baseDateKey = isoToDateKey(detailDate?.value) || dateKey;
+
+            let tasks = [];
+            try {
+                tasks = JSON.parse(detailOverlay.dataset.relatedTasks || '[]');
+                if (!Array.isArray(tasks)) tasks = [];
+            } catch {
+                tasks = [];
+            }
+
+            const checks = detailRelatedTasksTable
+                ? Array.from(detailRelatedTasksTable.querySelectorAll('tbody input[type="checkbox"]:checked'))
+                : [];
+            if (!checks.length) return;
+
+            const touchedDateKeys = new Set();
+            const createdIds = [];
+            const appendScheduleToDate = (targetDateKey, schedule) => {
+                const list = ensureScheduleMeta(targetDateKey, (scheduleByDate.get(targetDateKey) || []).slice());
+                const prepared = ensureScheduleMeta(targetDateKey, [schedule])[0];
+                list.push(prepared);
+                scheduleByDate.set(targetDateKey, list);
+                touchedDateKeys.add(targetDateKey);
+                return prepared;
+            };
+
+            const selectedDateKey = document
+                .querySelector('#calendarContainer .calSell.is-selected')
+                ?.getAttribute('data-date');
+
+            checks.forEach((chk) => {
+                const idx = parseInt(chk.getAttribute('data-task-index') || '', 10);
+                if (Number.isNaN(idx) || !tasks[idx]) return;
+                const task = tasks[idx];
+                const taskTitle = String(task?.title ?? '').trim();
+                if (!taskTitle) return;
+
+                const due = parseTaskDueToDateKeyAndTime(task?.due, baseDateKey);
+                const targetDateKey = due?.dateKey || baseDateKey;
+                if (!targetDateKey || targetDateKey === UNDATED_DATE_KEY) return;
+
+                // Avoid obvious duplicates under the same parent.
+                const existing = (scheduleByDate.get(targetDateKey) || []).some(
+                    (s) => String(s?.parentScheduleId || '') === String(scheduleId) && String(s?.type || '').trim() === taskTitle
+                );
+                if (existing) return;
+
+                const tStart = due?.start || null;
+                const tEnd = due?.end || null;
+                const tHasTime = !!tStart && !!tEnd;
+
+                const created = appendScheduleToDate(targetDateKey, {
+                    id: `s${scheduleSequence++}`,
+                    type: taskTitle,
+                    time: tHasTime ? { start: tStart, end: tEnd } : null,
+                    isDone: false,
+                    parentScheduleId: scheduleId,
+                });
+                if (created?.id) createdIds.push(created.id);
+            });
+
+            touchedDateKeys.forEach((k) => updateCalendarCellPlan(k));
+            if (selectedDateKey && touchedDateKeys.has(selectedDateKey)) {
+                renderDetailForDate(selectedDateKey);
+            }
+
+            saveSchedulesToStorage();
+
+            // Keep popup open; refresh hierarchy and feedback-highlight newly created items.
+            renderDetailHierarchyFor(dateKey, scheduleId, { highlightIds: createdIds });
+
+            // Clear selections & disable button again.
+            checks.forEach((c) => {
+                c.checked = false;
+            });
+            updateDetailAddRelatedTasksBtnState();
+        });
+    }
     const openDetailPopupFor = (dateKey, scheduleId) => {
         if (!detailOverlay) return;
         const schedule = findScheduleById(dateKey, scheduleId);
@@ -1503,10 +1763,13 @@ const user =
         detailOverlay.dataset.scheduleId = scheduleId;
 
         if (detailName) detailName.value = String(schedule?.type ?? '');
+        if (detailMemo) detailMemo.value = String(schedule?.memo ?? '');
         if (detailDate) detailDate.value = dateKeyToISO(dateKey);
         if (detailStart) detailStart.value = hourToTimeInput(schedule?.time?.start);
         if (detailEnd) detailEnd.value = hourToTimeInput(schedule?.time?.end);
         if (detailDone) detailDone.checked = !!schedule?.isDone;
+        if (detailAllDay) detailAllDay.checked = !schedule?.time;
+        applyDetailDateTimeToggleState();
 
         // Detail task suggest: start collapsed, hydrate existing tasks (but keep hidden until user clicks)
         collapseDetailTaskSuggest();
@@ -1517,8 +1780,38 @@ const user =
             setDetailRelatedTasks([]);
         }
 
+        updateDetailAddRelatedTasksBtnState();
+
+        renderDetailHierarchyFor(dateKey, scheduleId);
+
         openPopup('detailSchedulePopup');
     };
+
+    if (detailHierarchyBox) {
+        detailHierarchyBox.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-id]');
+            if (!btn) return;
+            const targetId = btn.getAttribute('data-id');
+            if (!targetId) return;
+
+            // Find the schedule anywhere (it might live on a different date).
+            let target = null;
+            for (const [dk, list] of scheduleByDate.entries()) {
+                const found = (list || []).find((s) => String(s?.id || '') === String(targetId));
+                if (found) {
+                    target = { dateKey: dk, scheduleId: String(targetId) };
+                    break;
+                }
+            }
+            if (!target) return;
+
+            if (target.dateKey && target.dateKey !== UNDATED_DATE_KEY) {
+                selectCalendarCell(target.dateKey);
+                renderDetailForDate(target.dateKey);
+            }
+            openDetailPopupFor(target.dateKey, target.scheduleId);
+        });
+    }
 
     const formatHourLabel = (hourValue) => {
         const h = Number(hourValue);
@@ -1659,6 +1952,8 @@ const user =
             if (!dateKey || !scheduleId) return;
             // Keep the list popup alive so user can return after closing detail
             overlapOverlay.classList.add('is-suspended');
+            overlapOverlay.setAttribute('aria-hidden', 'true');
+            overlapOverlay.hidden = true;
             openDetailPopupFor(dateKey, scheduleId);
         });
     }
@@ -1680,6 +1975,7 @@ const user =
                 if (!dateKey) return;
 
                 const type = String(addName?.value || '').trim() || '새 일정';
+                const memo = String(addMemo?.value || '').trim();
                 pushRecentScheduleName(type);
                 const isAllDay = !!addAllDay?.checked || isUndated;
                 const start = isAllDay ? '' : timeInputToHourString(addStart?.value);
@@ -1717,6 +2013,7 @@ const user =
                     type,
                     time,
                     isDone: false,
+                    memo,
                     relatedTasks,
                 });
 
@@ -1755,11 +2052,12 @@ const user =
                 } else if (selected && touchedDateKeys.has(selected)) {
                     renderDetailForDate(selected);
                 }
-                if (touchedDateKeys.has(UNDATED_DATE_KEY)) renderUndatedPanel();
+                // Undated schedules are stored but not rendered in the UI.
 
                 saveSchedulesToStorage();
 
                 if (addName) addName.value = '';
+                if (addMemo) addMemo.value = '';
                 if (addStart) addStart.value = '';
                 if (addEnd) addEnd.value = '';
                 if (addAllDay) addAllDay.checked = false;
@@ -1786,9 +2084,10 @@ const user =
 
                 const nextDateKey = isoToDateKey(detailDate?.value) || oldDateKey;
                 const nextType = String(detailName?.value || '').trim() || schedule.type;
+                const nextMemo = String(detailMemo?.value || '').trim();
                 const inputStart = timeInputToHourString(detailStart?.value);
                 const inputEnd = timeInputToHourString(detailEnd?.value);
-                const wantsNoTime = !inputStart || !inputEnd;
+                const wantsNoTime = !!detailAllDay?.checked || !inputStart || !inputEnd;
                 const nextStart = wantsNoTime ? null : inputStart;
                 const nextEnd = wantsNoTime ? null : inputEnd;
                 const nextDone = !!detailDone?.checked;
@@ -1796,6 +2095,7 @@ const user =
                 schedule.type = nextType;
                 schedule.time = wantsNoTime ? null : { start: nextStart, end: nextEnd };
                 schedule.isDone = nextDone;
+                schedule.memo = nextMemo;
 
                 const selected = document.querySelector('#calendarContainer .calSell.is-selected')?.getAttribute('data-date');
 
@@ -1810,9 +2110,6 @@ const user =
 
                     updateCalendarCellPlan(oldDateKey);
                     updateCalendarCellPlan(nextDateKey);
-                    if (oldDateKey === UNDATED_DATE_KEY || nextDateKey === UNDATED_DATE_KEY) {
-                        renderUndatedPanel();
-                    }
                     if (nextDateKey !== UNDATED_DATE_KEY) {
                         selectCalendarCell(nextDateKey);
                         renderDetailForDate(nextDateKey);
@@ -1823,7 +2120,6 @@ const user =
                 } else {
                     updateCalendarCellPlan(oldDateKey);
                     if (oldDateKey === UNDATED_DATE_KEY) {
-                        renderUndatedPanel();
                         if (selected) renderDetailForDate(selected);
                     } else {
                         renderDetailForDate(oldDateKey);
@@ -1862,9 +2158,7 @@ const user =
                 );
 
                 updateCalendarCellPlan(dateKey);
-                if (dateKey === UNDATED_DATE_KEY) {
-                    renderUndatedPanel();
-                } else {
+                if (dateKey !== UNDATED_DATE_KEY) {
                     renderDetailForDate(dateKey);
                 }
 
@@ -1901,5 +2195,4 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSchedulesFromStorage();
     generateCalendar();
     setupPopupToggles();
-    saveSchedulesToStorage();
 });

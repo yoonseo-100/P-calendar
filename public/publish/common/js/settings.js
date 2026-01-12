@@ -1,7 +1,91 @@
 (function () {
     'use strict';
 
-    var SETTINGS_KEY = '__p_calendar_settings__';
+    var DEFAULT_UI = {
+        storageKey: '__p_calendar_settings__',
+        selectors: {
+            weekStartSelectId: 'weekStartSelect',
+            showWeatherToggleId: 'showWeatherToggle',
+            weekdayWakeTimeId: 'weekdayWakeTime',
+            weekdaySleepTimeId: 'weekdaySleepTime',
+            weekendSleepSeparateId: 'weekendSleepSeparate',
+            weekendSleepSectionId: 'weekendSleepSection',
+            weekendWakeTimeId: 'weekendWakeTime',
+            weekendSleepTimeId: 'weekendSleepTime',
+            saveButtonSelector: '.settingsPrimary',
+            resetButtonSelector: '.settingsBtn.danger',
+        },
+        strings: {
+            saved: '설정이 저장되었습니다.',
+            saveFailed: '저장에 실패했습니다. 브라우저 설정을 확인해주세요.',
+            resetConfirm: '로컬에 저장된 설정값을 초기화할까요?',
+        },
+    };
+
+    function getUiSettings() {
+        var fromGlobal = window.__P_SETTINGS_UI__;
+        if (!fromGlobal || typeof fromGlobal !== 'object') return DEFAULT_UI;
+
+        var s = {
+            storageKey:
+                typeof fromGlobal.storageKey === 'string' ? fromGlobal.storageKey : DEFAULT_UI.storageKey,
+            selectors: {
+                weekStartSelectId:
+                    typeof (fromGlobal.selectors || {}).weekStartSelectId === 'string'
+                        ? fromGlobal.selectors.weekStartSelectId
+                        : DEFAULT_UI.selectors.weekStartSelectId,
+                showWeatherToggleId:
+                    typeof (fromGlobal.selectors || {}).showWeatherToggleId === 'string'
+                        ? fromGlobal.selectors.showWeatherToggleId
+                        : DEFAULT_UI.selectors.showWeatherToggleId,
+                weekdayWakeTimeId:
+                    typeof (fromGlobal.selectors || {}).weekdayWakeTimeId === 'string'
+                        ? fromGlobal.selectors.weekdayWakeTimeId
+                        : DEFAULT_UI.selectors.weekdayWakeTimeId,
+                weekdaySleepTimeId:
+                    typeof (fromGlobal.selectors || {}).weekdaySleepTimeId === 'string'
+                        ? fromGlobal.selectors.weekdaySleepTimeId
+                        : DEFAULT_UI.selectors.weekdaySleepTimeId,
+                weekendSleepSeparateId:
+                    typeof (fromGlobal.selectors || {}).weekendSleepSeparateId === 'string'
+                        ? fromGlobal.selectors.weekendSleepSeparateId
+                        : DEFAULT_UI.selectors.weekendSleepSeparateId,
+                weekendSleepSectionId:
+                    typeof (fromGlobal.selectors || {}).weekendSleepSectionId === 'string'
+                        ? fromGlobal.selectors.weekendSleepSectionId
+                        : DEFAULT_UI.selectors.weekendSleepSectionId,
+                weekendWakeTimeId:
+                    typeof (fromGlobal.selectors || {}).weekendWakeTimeId === 'string'
+                        ? fromGlobal.selectors.weekendWakeTimeId
+                        : DEFAULT_UI.selectors.weekendWakeTimeId,
+                weekendSleepTimeId:
+                    typeof (fromGlobal.selectors || {}).weekendSleepTimeId === 'string'
+                        ? fromGlobal.selectors.weekendSleepTimeId
+                        : DEFAULT_UI.selectors.weekendSleepTimeId,
+                saveButtonSelector:
+                    typeof (fromGlobal.selectors || {}).saveButtonSelector === 'string'
+                        ? fromGlobal.selectors.saveButtonSelector
+                        : DEFAULT_UI.selectors.saveButtonSelector,
+                resetButtonSelector:
+                    typeof (fromGlobal.selectors || {}).resetButtonSelector === 'string'
+                        ? fromGlobal.selectors.resetButtonSelector
+                        : DEFAULT_UI.selectors.resetButtonSelector,
+            },
+            strings: {
+                saved: typeof (fromGlobal.strings || {}).saved === 'string' ? fromGlobal.strings.saved : DEFAULT_UI.strings.saved,
+                saveFailed:
+                    typeof (fromGlobal.strings || {}).saveFailed === 'string'
+                        ? fromGlobal.strings.saveFailed
+                        : DEFAULT_UI.strings.saveFailed,
+                resetConfirm:
+                    typeof (fromGlobal.strings || {}).resetConfirm === 'string'
+                        ? fromGlobal.strings.resetConfirm
+                        : DEFAULT_UI.strings.resetConfirm,
+            },
+        };
+
+        return s;
+    }
 
     var DEFAULT_SETTINGS = {
         calendar: {
@@ -18,16 +102,18 @@
     function safeParse(jsonString) {
         try {
             return JSON.parse(jsonString);
-        } catch (e) {
+        } catch {
             return null;
         }
     }
 
     function readSettings() {
+        var ui = getUiSettings();
+        var SETTINGS_KEY = ui.storageKey;
         var raw = null;
         try {
             raw = localStorage.getItem(SETTINGS_KEY);
-        } catch (e) {
+        } catch {
             raw = null;
         }
 
@@ -77,10 +163,12 @@
     }
 
     function writeSettings(settings) {
+        var ui = getUiSettings();
+        var SETTINGS_KEY = ui.storageKey;
         try {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
             return true;
-        } catch (e) {
+        } catch {
             return false;
         }
     }
@@ -97,18 +185,21 @@
     }
 
     function init() {
-        var weekStartSelect = document.getElementById('weekStartSelect');
-        var showWeatherToggle = document.getElementById('showWeatherToggle');
+        var ui = getUiSettings();
+        var sel = ui.selectors;
 
-        var weekdayWakeTime = document.getElementById('weekdayWakeTime');
-        var weekdaySleepTime = document.getElementById('weekdaySleepTime');
-        var weekendSleepSeparate = document.getElementById('weekendSleepSeparate');
-        var weekendSleepSection = document.getElementById('weekendSleepSection');
-        var weekendWakeTime = document.getElementById('weekendWakeTime');
-        var weekendSleepTime = document.getElementById('weekendSleepTime');
+        var weekStartSelect = document.getElementById(sel.weekStartSelectId);
+        var showWeatherToggle = document.getElementById(sel.showWeatherToggleId);
 
-        var saveBtn = document.querySelector('.settingsPrimary');
-        var resetBtn = document.querySelector('.settingsBtn.danger');
+        var weekdayWakeTime = document.getElementById(sel.weekdayWakeTimeId);
+        var weekdaySleepTime = document.getElementById(sel.weekdaySleepTimeId);
+        var weekendSleepSeparate = document.getElementById(sel.weekendSleepSeparateId);
+        var weekendSleepSection = document.getElementById(sel.weekendSleepSectionId);
+        var weekendWakeTime = document.getElementById(sel.weekendWakeTimeId);
+        var weekendSleepTime = document.getElementById(sel.weekendSleepTimeId);
+
+        var saveBtn = document.querySelector(sel.saveButtonSelector);
+        var resetBtn = document.querySelector(sel.resetButtonSelector);
 
         if (!weekStartSelect || !showWeatherToggle || !weekdayWakeTime || !weekdaySleepTime || !weekendSleepSeparate || !weekendSleepSection || !weekendWakeTime || !weekendSleepTime) {
             return;
@@ -155,20 +246,20 @@
                 var next = collect();
                 var ok = writeSettings(next);
                 if (ok) {
-                    alert('설정이 저장되었습니다.');
+                    alert(ui.strings.saved);
                 } else {
-                    alert('저장에 실패했습니다. 브라우저 설정을 확인해주세요.');
+                    alert(ui.strings.saveFailed);
                 }
             });
         }
 
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {
-                var sure = confirm('로컬에 저장된 설정값을 초기화할까요?');
+                var sure = confirm(ui.strings.resetConfirm);
                 if (!sure) return;
                 try {
-                    localStorage.removeItem(SETTINGS_KEY);
-                } catch (e) {
+                    localStorage.removeItem(ui.storageKey);
+                } catch {
                     // ignore
                 }
                 location.reload();

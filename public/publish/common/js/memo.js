@@ -1,14 +1,55 @@
 (function () {
     'use strict';
 
-    var APP_SCHEDULES_KEY = '__p_calendar_schedules__';
+    var DEFAULT_SETTINGS = {
+        schedulesKey: '__p_calendar_schedules__',
+        undatedKey: '__undated__',
+        selectors: {
+            daysId: 'memoDays',
+        },
+        strings: {
+            empty: '표시할 일정이 없어요',
+            undated: '날짜 미정',
+            fallbackTitle: '일정',
+            unsetTimePrefix: '미지정',
+        },
+        locale: 'ko',
+        dayNames: ['일', '월', '화', '수', '목', '금', '토'],
+    };
+
+    function getSettings() {
+        var fromGlobal = window.__P_MEMO_SETTINGS__;
+        if (!fromGlobal || typeof fromGlobal !== 'object') return DEFAULT_SETTINGS;
+
+        return {
+            schedulesKey: typeof fromGlobal.schedulesKey === 'string' ? fromGlobal.schedulesKey : DEFAULT_SETTINGS.schedulesKey,
+            undatedKey: typeof fromGlobal.undatedKey === 'string' ? fromGlobal.undatedKey : DEFAULT_SETTINGS.undatedKey,
+            selectors: {
+                daysId:
+                    typeof (fromGlobal.selectors || {}).daysId === 'string'
+                        ? fromGlobal.selectors.daysId
+                        : DEFAULT_SETTINGS.selectors.daysId,
+            },
+            strings: {
+                empty: typeof (fromGlobal.strings || {}).empty === 'string' ? fromGlobal.strings.empty : DEFAULT_SETTINGS.strings.empty,
+                undated:
+                    typeof (fromGlobal.strings || {}).undated === 'string' ? fromGlobal.strings.undated : DEFAULT_SETTINGS.strings.undated,
+                fallbackTitle:
+                    typeof (fromGlobal.strings || {}).fallbackTitle === 'string'
+                        ? fromGlobal.strings.fallbackTitle
+                        : DEFAULT_SETTINGS.strings.fallbackTitle,
+                unsetTimePrefix:
+                    typeof (fromGlobal.strings || {}).unsetTimePrefix === 'string'
+                        ? fromGlobal.strings.unsetTimePrefix
+                        : DEFAULT_SETTINGS.strings.unsetTimePrefix,
+            },
+            locale: typeof fromGlobal.locale === 'string' ? fromGlobal.locale : DEFAULT_SETTINGS.locale,
+            dayNames: Array.isArray(fromGlobal.dayNames) && fromGlobal.dayNames.length === 7 ? fromGlobal.dayNames : DEFAULT_SETTINGS.dayNames,
+        };
+    }
 
     function pad2(n) {
         return String(n ?? '').padStart(2, '0');
-    }
-
-    function getDateKey(date) {
-        return date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
     }
 
     function parseDateKey(key) {
@@ -42,21 +83,23 @@
     }
 
     function safeLoadAll() {
+        var settings = getSettings();
         try {
-            var raw = localStorage.getItem(APP_SCHEDULES_KEY);
+            var raw = localStorage.getItem(settings.schedulesKey);
             if (!raw) return null;
             var parsed = JSON.parse(raw);
             if (!parsed || typeof parsed !== 'object') return null;
             return parsed;
-        } catch (e) {
+        } catch {
             return null;
         }
     }
 
     function safeSaveAll(obj) {
+        var settings = getSettings();
         try {
-            localStorage.setItem(APP_SCHEDULES_KEY, JSON.stringify(obj || {}));
-        } catch (e) {
+            localStorage.setItem(settings.schedulesKey, JSON.stringify(obj || {}));
+        } catch {
             // ignore
         }
     }
@@ -64,23 +107,36 @@
     // NOTE: This app used to seed random demo schedules.
     // We now show only real persisted schedules to avoid dummy values.
 
-    function formatDateLabel(date) {
+    function formatDateLabel(dateKey, date) {
+        var settings = getSettings();
+        if (String(dateKey || '') === String(settings.undatedKey)) return settings.strings.undated;
+
         var yy = String(date.getFullYear()).slice(-2);
         var mm = pad2(date.getMonth() + 1);
         var dd = pad2(date.getDate());
-        var kor = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+        var kor = (settings.dayNames || DEFAULT_SETTINGS.dayNames)[date.getDay()];
         return yy + '/' + mm + '/' + dd + ' ' + kor + '요일';
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
     function buildItemText(schedule) {
+        var settings = getSettings();
         var title = String(schedule?.type ?? '').trim();
-        if (!title) title = '일정';
+        if (!title) title = settings.strings.fallbackTitle;
 
         var startH = toHour(schedule?.time?.start);
         var endH = toHour(schedule?.time?.end);
 
         if (startH == null || endH == null) {
-            return '미지정 ' + title;
+            return settings.strings.unsetTimePrefix + ' ' + title;
         }
 
         return pad2(startH) + ':00~' + pad2(endH) + ':00 ' + title;
@@ -98,7 +154,8 @@
     }
 
     function init() {
-        var daysEl = document.getElementById('memoDays');
+        var settings = getSettings();
+        var daysEl = document.getElementById(settings.selectors.daysId);
         if (!daysEl) return;
 
         function renderAll() {
@@ -109,14 +166,14 @@
             keys.sort(compareDateKeys);
 
             if (!keys.length) {
-                daysEl.innerHTML = '<div class="memoEmpty">표시할 일정이 없어요</div>';
+                daysEl.innerHTML = '<div class="memoEmpty">' + escapeHtml(settings.strings.empty) + '</div>';
                 return;
             }
 
             daysEl.innerHTML = keys
                 .map(function (dateKey) {
                     var d = parseDateKey(dateKey);
-                    var label = d ? formatDateLabel(d) : String(dateKey);
+                    var label = d ? formatDateLabel(dateKey, d) : String(dateKey);
                     var list = Array.isArray(all[dateKey]) ? all[dateKey].slice() : [];
                     list.sort(sortForChecklist);
 
@@ -124,7 +181,7 @@
                         .map(function (s) {
                             var id = String(s?.id || '');
                             var checked = s?.isDone ? 'checked' : '';
-                            var text = buildItemText(s);
+                            var text = escapeHtml(buildItemText(s));
                             var inputId = 'memoTodo_' + dateKey.replace(/[^0-9]/g, '') + '_' + id;
                             return (
                                 '<li>' +
@@ -137,7 +194,7 @@
 
                     return (
                         '<div class="todoList memoDay" data-date="' + dateKey + '">' +
-                        '<div class="headBox"><div class="date"><h2><b>' + label + '</b></h2></div></div>' +
+                        '<div class="headBox"><div class="date"><h2><b>' + escapeHtml(label) + '</b></h2></div></div>' +
                         '<div class="contBox"><ul>' + itemsHtml + '</ul></div>' +
                         '</div>'
                     );
