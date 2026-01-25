@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabaseClient'
 import HomePage from './components/HomePage'
 import CalendarPage from './components/CalendarPage'
+import SettingsPage from './components/SettingsPage'
 
 const initialTodos = [
   { id: 'todo1', text: '8:40~18:00 대전 해커톤 멘토', checked: false },
@@ -14,7 +15,7 @@ const initialTodos = [
 function App() {
   const [session, setSession] = useState(null)
   const [todoList, setTodoList] = useState(initialTodos)
-  const [currentPage, setCurrentPage] = useState('home') // 'home' or 'calendar'
+  const [currentPage, setCurrentPage] = useState('home') // 'home', 'calendar', or 'settings'
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -40,9 +41,14 @@ function App() {
           setTodoList={setTodoList}
           onNavigateToCalendar={() => setCurrentPage('calendar')}
         />
-              ) : (
+      ) : currentPage === 'calendar' ? (
         <CalendarPage
           onNavigateToHome={() => setCurrentPage('home')}
+          onNavigateToSettings={() => setCurrentPage('settings')}
+        />
+      ) : (
+        <SettingsPage
+          onNavigateToCalendar={() => setCurrentPage('calendar')}
         />
       )}
     </>

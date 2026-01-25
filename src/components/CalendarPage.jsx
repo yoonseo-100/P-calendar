@@ -40,7 +40,7 @@ function generateSchedulesForDate(date) {
   return schedules
 }
 
-function CalendarPage({ onNavigateToHome }) {
+function CalendarPage({ onNavigateToHome, onNavigateToSettings }) {
   const calendarContainerRef = useRef(null)
   const contentRef = useRef(null)
 
@@ -249,6 +249,11 @@ function CalendarPage({ onNavigateToHome }) {
           <button type="button" className="tabItem NOW">
             <h4>개인일정</h4>
           </button>
+          {onNavigateToSettings && (
+            <button type="button" className="tabItem" onClick={onNavigateToSettings}>
+              <h4>설정</h4>
+            </button>
+          )}
         </div>
         <div className="control"></div>
       </nav>
@@ -261,5 +266,6 @@ function CalendarPage({ onNavigateToHome }) {
 }
 
 export default CalendarPage
+
 
 
