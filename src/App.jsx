@@ -40,7 +40,7 @@ function App() {
           setTodoList={setTodoList}
           onNavigateToCalendar={() => setCurrentPage('calendar')}
         />
-      ) : (
+              ) : (
         <CalendarPage
           onNavigateToHome={() => setCurrentPage('home')}
         />
